@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#7C3AED">
+  <title>偏头痛 & 经期记录</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- ===== Dashboard ===== -->
+    <section id="view-dashboard" class="view active">
+      <header class="view-header">
+        <h1><span id="current-user-name"></span> 的健康日记</h1>
+        <div class="header-btns">
+        <button class="icon-btn" onclick="showUserPicker()" aria-label="切换用户" title="切换用户">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </button>
+        <button class="icon-btn" onclick="showSettings()" aria-label="设置">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        </button>
+        </div>
+      </header>
+      <div class="view-body">
+        <div class="quick-actions">
+          <button class="action-card migraine" onclick="showRecordMigraine()">
+            <div class="action-icon">⚡</div>
+            <span>记录头痛</span>
+          </button>
+          <button class="action-card period" onclick="showRecordPeriod()">
+            <div class="action-icon">🌸</div>
+            <span>记录经期</span>
+          </button>
+        </div>
+        <div class="stats-row" id="dashboard-stats"></div>
+        <div class="section-title">最近记录</div>
+        <div id="recent-records"></div>
+      </div>
+    </section>
+
+    <!-- ===== Calendar ===== -->
+    <section id="view-calendar" class="view">
+      <header class="view-header">
+        <button class="icon-btn" onclick="calendarPrev()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h1 id="calendar-title">2026年3月</h1>
+        <button class="icon-btn" onclick="calendarNext()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </header>
+      <div class="view-body">
+        <div class="calendar-weekdays">
+          <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+        </div>
+        <div class="calendar-grid" id="calendar-grid"></div>
+        <div class="calendar-legend">
+          <span class="legend-item"><span class="dot migraine"></span>偏头痛</span>
+          <span class="legend-item"><span class="dot period"></span>经期</span>
+        </div>
+        <div id="calendar-day-detail"></div>
+      </div>
+    </section>
+
+    <!-- ===== History ===== -->
+    <section id="view-history" class="view">
+      <header class="view-header">
+        <h1>历史记录</h1>
+      </header>
+      <div class="view-body">
+        <div class="filter-tabs">
+          <button class="filter-tab active" data-filter="all" onclick="filterHistory('all',this)">全部</button>
+          <button class="filter-tab" data-filter="migraine" onclick="filterHistory('migraine',this)">偏头痛</button>
+          <button class="filter-tab" data-filter="period" onclick="filterHistory('period',this)">经期</button>
+        </div>
+        <div id="history-list"></div>
+      </div>
+    </section>
+
+    <!-- ===== Statistics ===== -->
+    <section id="view-stats" class="view">
+      <header class="view-header">
+        <h1>统计分析</h1>
+      </header>
+      <div class="view-body" id="stats-content"></div>
+    </section>
+
+    <!-- ===== Bottom Navigation ===== -->
+    <nav id="bottom-nav">
+      <button class="nav-btn active" data-view="dashboard" onclick="switchView('dashboard',this)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>首页</span>
+      </button>
+      <button class="nav-btn" data-view="calendar" onclick="switchView('calendar',this)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>日历</span>
+      </button>
+      <button class="nav-btn" data-view="history" onclick="switchView('history',this)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>历史</span>
+      </button>
+      <button class="nav-btn" data-view="stats" onclick="switchView('stats',this)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span>统计</span>
+      </button>
+    </nav>
+
+    <!-- ===== Modal: Record Migraine ===== -->
+    <div id="modal-migraine" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>记录偏头痛</h2>
+          <button class="icon-btn" onclick="closeModal('modal-migraine')">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form id="form-migraine" onsubmit="saveMigraine(event)">
+
+          <div class="form-section-label">时间信息</div>
+          <div class="form-group">
+            <label>发作开始</label>
+            <input type="datetime-local" id="m-start-dt" required>
+          </div>
+          <div class="form-group">
+            <label>发作结束（可稍后补填）</label>
+            <input type="datetime-local" id="m-end-dt">
+          </div>
+          <div class="form-group">
+            <label>持续时长</label>
+            <div class="duration-display" id="m-duration-display">填写开始和结束时间后自动计算</div>
+            <input type="hidden" id="m-duration-val">
+          </div>
+
+          <div class="form-section-label">头痛详情</div>
+          <div class="form-group">
+            <label>疼痛部位（可多选）</label>
+            <div class="chip-group" id="m-locations">
+              <button type="button" class="chip" data-value="left">左侧</button>
+              <button type="button" class="chip" data-value="right">右侧</button>
+              <button type="button" class="chip" data-value="top">头顶</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>严重程度</label>
+            <div class="severity-picker" id="m-severity">
+              <button type="button" class="severity-btn" data-value="1"><span class="severity-dot s1"></span>轻度</button>
+              <button type="button" class="severity-btn" data-value="2"><span class="severity-dot s2"></span>轻中度</button>
+              <button type="button" class="severity-btn" data-value="3"><span class="severity-dot s3"></span>中度</button>
+              <button type="button" class="severity-btn" data-value="4"><span class="severity-dot s4"></span>中重度</button>
+              <button type="button" class="severity-btn" data-value="5"><span class="severity-dot s5"></span>重度</button>
+            </div>
+          </div>
+
+          <div class="form-section-label">伴随与前驱症状</div>
+          <div class="form-group">
+            <label>伴随症状（可多选）</label>
+            <div class="chip-group" id="m-symptoms">
+              <button type="button" class="chip" data-value="vomiting">呕吐</button>
+              <button type="button" class="chip" data-value="nausea">恶心</button>
+              <button type="button" class="chip" data-value="photophobia">怕光</button>
+              <button type="button" class="chip" data-value="phonophobia">怕声音</button>
+              <button type="button" class="chip" data-value="appetite_loss">食欲下降</button>
+              <button type="button" class="chip" data-value="dizziness">头晕</button>
+              <button type="button" class="chip" data-value="nasal">鼻部不适</button>
+              <button type="button" class="chip" data-value="diarrhea">腹泻</button>
+              <button type="button" class="chip" data-value="heavy_head">脑袋昏沉</button>
+              <button type="button" class="chip chip-add-other" data-for="m-symptoms">+ 其他</button>
+            </div>
+            <div class="custom-input-row hidden" data-for="m-symptoms">
+              <input type="text" placeholder="输入自定义选项..." maxlength="20">
+              <button type="button" class="custom-input-add" data-for="m-symptoms">添加</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>前驱症状（可多选）</label>
+            <div class="chip-group" id="m-prodromal">
+              <button type="button" class="chip" data-value="drowsy">极度困倦/打呵欠</button>
+              <button type="button" class="chip" data-value="chills">畏寒/打寒颤</button>
+              <button type="button" class="chip" data-value="sneeze">打喷嚏</button>
+              <button type="button" class="chip" data-value="runny_nose">流清水鼻涕</button>
+              <button type="button" class="chip" data-value="head_foggy">头部轻微不适/懵感</button>
+              <button type="button" class="chip" data-value="head_swell">轻微头胀</button>
+              <button type="button" class="chip chip-add-other" data-for="m-prodromal">+ 其他</button>
+            </div>
+            <div class="custom-input-row hidden" data-for="m-prodromal">
+              <input type="text" placeholder="输入自定义选项..." maxlength="20">
+              <button type="button" class="custom-input-add" data-for="m-prodromal">添加</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>头痛后的症状</label>
+            <textarea id="m-post-symptoms" rows="2" placeholder="头痛缓解后的残余症状，如头沉、懵痛感等..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>头痛后症状持续时间（小时）</label>
+            <input type="number" id="m-post-duration" min="0" step="0.5" placeholder="例如: 4">
+          </div>
+
+          <div class="form-section-label">诱因与环境</div>
+          <div class="form-group">
+            <label>可能诱因（可多选）</label>
+            <div class="chip-group" id="m-triggers">
+              <button type="button" class="chip" data-value="fatigue">劳累/疲惫</button>
+              <button type="button" class="chip" data-value="screen">用眼/注意力集中</button>
+              <button type="button" class="chip" data-value="period">生理期相关</button>
+              <button type="button" class="chip" data-value="sleep">睡眠不足</button>
+              <button type="button" class="chip" data-value="weather">天气变化</button>
+              <button type="button" class="chip" data-value="emotion">情绪波动</button>
+              <button type="button" class="chip" data-value="cold">受寒/吹风</button>
+              <button type="button" class="chip" data-value="talking">说话过多</button>
+              <button type="button" class="chip" data-value="smell">气味刺激</button>
+              <button type="button" class="chip chip-add-other" data-for="m-triggers">+ 其他</button>
+            </div>
+            <div class="custom-input-row hidden" data-for="m-triggers">
+              <input type="text" placeholder="输入自定义选项..." maxlength="20">
+              <button type="button" class="custom-input-add" data-for="m-triggers">添加</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>当日天气（可多选）</label>
+            <div class="chip-group" id="m-weather">
+              <button type="button" class="chip" data-value="sunny">晴</button>
+              <button type="button" class="chip" data-value="cloudy">多云</button>
+              <button type="button" class="chip" data-value="overcast">阴</button>
+              <button type="button" class="chip" data-value="rainy">雨</button>
+              <button type="button" class="chip" data-value="hot">闷热</button>
+              <button type="button" class="chip" data-value="cold_w">寒冷</button>
+              <button type="button" class="chip" data-value="windy">大风</button>
+              <button type="button" class="chip" data-value="humid">潮湿</button>
+              <button type="button" class="chip chip-add-other" data-for="m-weather">+ 其他</button>
+            </div>
+            <div class="custom-input-row hidden" data-for="m-weather">
+              <input type="text" placeholder="输入自定义选项..." maxlength="20">
+              <button type="button" class="custom-input-add" data-for="m-weather">添加</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>当天睡眠时间（小时）</label>
+            <input type="number" id="m-sleep" min="0" max="24" step="0.5" placeholder="例如: 7">
+          </div>
+          <div class="form-group">
+            <label>发作前 24 小时内的饮食</label>
+            <textarea id="m-diet" rows="2" placeholder="记录发作前吃了什么..."></textarea>
+          </div>
+
+          <div class="form-section-label">缓解与用药</div>
+          <div class="form-group">
+            <label>缓解方法（可多选）</label>
+            <div class="chip-group" id="m-relief">
+              <button type="button" class="chip" data-value="sleep">睡觉/休息</button>
+              <button type="button" class="chip" data-value="hot_wash">洗热水头/澡</button>
+              <button type="button" class="chip" data-value="taichong">按压太冲穴</button>
+              <button type="button" class="chip" data-value="massage">按摩</button>
+              <button type="button" class="chip" data-value="footbath">泡脚</button>
+              <button type="button" class="chip" data-value="huoxiang">藿香正气散</button>
+              <button type="button" class="chip" data-value="comb">梳头</button>
+              <button type="button" class="chip" data-value="sneeze">取嚏法</button>
+              <button type="button" class="chip" data-value="sun">晒太阳</button>
+              <button type="button" class="chip" data-value="music">听音乐/金刚经</button>
+              <button type="button" class="chip chip-add-other" data-for="m-relief">+ 其他</button>
+            </div>
+            <div class="custom-input-row hidden" data-for="m-relief">
+              <input type="text" placeholder="输入自定义选项..." maxlength="20">
+              <button type="button" class="custom-input-add" data-for="m-relief">添加</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>是否服用止痛药</label>
+            <div class="chip-group single-select" id="m-med-taken">
+              <button type="button" class="chip" data-value="yes">是</button>
+              <button type="button" class="chip" data-value="no">否</button>
+            </div>
+          </div>
+          <div id="m-med-details" class="med-details hidden">
+            <div class="form-group">
+              <label>药物名称</label>
+              <input type="text" id="m-med-name" placeholder="例如: 布洛芬">
+            </div>
+            <div class="form-row">
+              <div class="form-group" style="flex:1">
+                <label>剂量</label>
+                <input type="text" id="m-med-dosage" placeholder="例如: 400mg">
+              </div>
+              <div class="form-group" style="flex:1">
+                <label>服用时间</label>
+                <input type="time" id="m-med-time">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>药物是否有效</label>
+              <div class="chip-group single-select" id="m-med-effective">
+                <button type="button" class="chip" data-value="effective">有效</button>
+                <button type="button" class="chip" data-value="partial">部分有效</button>
+                <button type="button" class="chip" data-value="ineffective">无效</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>备注</label>
+            <textarea id="m-notes" rows="2" placeholder="补充说明..."></textarea>
+          </div>
+          <input type="hidden" id="m-edit-id">
+          <button type="submit" class="btn-primary">保存记录</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ===== Modal: Record Period ===== -->
+    <div id="modal-period" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>记录经期</h2>
+          <button class="icon-btn" onclick="closeModal('modal-period')">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form id="form-period" onsubmit="savePeriod(event)">
+          <div class="form-group">
+            <label>开始日期</label>
+            <input type="date" id="p-start" required>
+          </div>
+          <div class="form-group">
+            <label>结束日期（可稍后补填）</label>
+            <input type="date" id="p-end">
+          </div>
+          <div class="form-group">
+            <label>持续天数</label>
+            <input type="number" id="p-duration" min="1" max="15" placeholder="自动计算或手动填写">
+          </div>
+          <div class="form-group">
+            <label>每日卫生巾用量（用逗号分隔，如 2,3.5,1,0.5）</label>
+            <input type="text" id="p-pads" placeholder="例如: 2,3.5,1,0.5,0.5">
+          </div>
+          <div class="form-group">
+            <label>备注</label>
+            <textarea id="p-notes" rows="2" placeholder="补充说明..."></textarea>
+          </div>
+          <input type="hidden" id="p-edit-id">
+          <button type="submit" class="btn-primary">保存记录</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ===== Modal: Record Detail ===== -->
+    <div id="modal-detail" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="detail-title">记录详情</h2>
+          <button class="icon-btn" onclick="closeModal('modal-detail')">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div id="detail-body"></div>
+        <div class="detail-actions">
+          <button class="btn-secondary" id="detail-edit-btn">编辑</button>
+          <button class="btn-danger" id="detail-delete-btn">删除</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Modal: Settings ===== -->
+    <div id="modal-settings" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>设置</h2>
+          <button class="icon-btn" onclick="closeModal('modal-settings')">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="settings-body">
+          <button class="settings-btn" onclick="exportData()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            导出数据 (JSON)
+          </button>
+          <button class="settings-btn" onclick="document.getElementById('import-file').click()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            导入数据 (JSON)
+          </button>
+          <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+          <button class="settings-btn danger" onclick="confirmClearData()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            清除所有数据
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- User Picker Modal -->
+    <div id="modal-user" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>切换用户</h2>
+          <button class="icon-btn" onclick="closeModal('modal-user')">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="user-picker-body">
+          <div id="user-list" class="user-list"></div>
+          <div class="user-add-row">
+            <input type="text" id="new-user-input" placeholder="输入新用户名..." maxlength="20">
+            <button class="user-add-btn" onclick="addNewUser()">添加</button>
+          </div>
+          <p class="user-hint">每位用户的数据独立存储，互不影响。<br>分享链接时加上 <code>?user=名字</code> 即可直接进入对应用户。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
