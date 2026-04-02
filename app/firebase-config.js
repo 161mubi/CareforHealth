@@ -156,6 +156,7 @@ function showCloudAuth() {
 
 function setCloudAuthMode(mode) {
   document.getElementById('cloud-auth-title').textContent = mode === 'login' ? '登录' : '注册';
+  document.getElementById('cloud-auth-subtitle').textContent = mode === 'login' ? '登录后数据自动同步云端' : '注册账号，开启云端同步';
   document.getElementById('cloud-auth-submit').textContent = mode === 'login' ? '登录' : '注册';
   document.getElementById('cloud-auth-mode').dataset.mode = mode;
   document.getElementById('cloud-auth-switch').innerHTML = mode === 'login'

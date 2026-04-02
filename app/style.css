@@ -609,6 +609,9 @@ html, body {
 .form-group input[type="datetime-local"],
 .form-group input[type="number"],
 .form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group input[type="time"],
 .form-group textarea {
   width: 100%;
   padding: 10px 14px;
@@ -939,23 +942,60 @@ html, body {
 }
 
 /* ===== Cloud Auth Modal ===== */
+.auth-modal-content {
+  border-radius: 20px !important;
+  max-width: 380px;
+  margin: auto;
+  padding: 24px 20px calc(24px + var(--safe-bottom)) !important;
+  position: relative;
+}
+.auth-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1;
+}
+.auth-hero {
+  text-align: center;
+  padding: 8px 0 20px;
+}
+.auth-icon {
+  font-size: 40px;
+  margin-bottom: 8px;
+}
+.auth-hero h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.auth-subtitle {
+  font-size: 13px;
+  color: var(--text3);
+}
+.auth-submit {
+  font-size: 16px;
+  padding: 14px;
+  margin-top: 4px;
+}
 .cloud-auth-error {
   font-size: 13px;
   color: var(--red);
-  min-height: 20px;
-  margin-bottom: 8px;
+  min-height: 18px;
+  margin-bottom: 4px;
+  text-align: center;
 }
 .cloud-auth-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 14px;
+  margin-top: 16px;
   font-size: 13px;
   color: var(--text2);
 }
 .cloud-auth-footer a {
   color: var(--primary);
   text-decoration: none;
+  font-weight: 500;
 }
 .cloud-auth-footer a:hover { text-decoration: underline; }
 
