@@ -1,4 +1,4 @@
-const CACHE_NAME = 'health-diary-v4';
+const CACHE_NAME = 'health-diary-v6';
 const ASSETS = ['./index.html', './style.css', './app.js', './firebase-config.js', './manifest.json'];
 
 self.addEventListener('install', e => {

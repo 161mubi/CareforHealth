@@ -1378,14 +1378,18 @@ html, body {
   --text2: #9CA3AF;
   --text3: #6B7280;
   --border: #374151;
-  --primary-bg: #2E1065;
+  --primary: #A78BFA;
+  --primary-light: #C4B5FD;
+  --primary-bg: #312E81;
   --pink-bg: #4A0D2E;
 }
 [data-theme="dark"] .action-card.migraine {
-  background: linear-gradient(135deg, #2E1065, #3B0764);
+  background: linear-gradient(135deg, #312E81, #4C1D95);
+  color: #DDD6FE;
 }
 [data-theme="dark"] .action-card.period {
   background: linear-gradient(135deg, #4A0D2E, #831843);
+  color: #FBCFE8;
 }
 [data-theme="dark"] .cal-day:not(.empty):active {
   background: #374151;
@@ -1393,8 +1397,40 @@ html, body {
 [data-theme="dark"] .compare-row:nth-child(even) {
   background: #1a2332;
 }
+[data-theme="dark"] .compare-header {
+  background: #3B2F80;
+  color: #E0D4FF;
+}
 [data-theme="dark"] .bar-val {
   color: #F3F4F6;
+}
+[data-theme="dark"] .toast {
+  background: #E5E7EB;
+  color: #111827;
+}
+[data-theme="dark"] .toast-undo {
+  background: #E5E7EB;
+  color: #111827;
+}
+[data-theme="dark"] .card-tag {
+  background: #352B6B;
+  color: #C4B5FD;
+}
+[data-theme="dark"] .card-tag.pink {
+  background: #5C1A3B;
+  color: #F9A8D4;
+}
+[data-theme="dark"] .section-title {
+  color: var(--text);
+}
+[data-theme="dark"] .highlight-purple {
+  color: #C4B5FD;
+}
+[data-theme="dark"] .stat-value {
+  color: #C4B5FD;
+}
+[data-theme="dark"] .nav-btn.active {
+  color: #C4B5FD;
 }
 
 /* ===== Search Bar ===== */
