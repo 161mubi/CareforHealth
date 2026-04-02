@@ -162,6 +162,16 @@ function setCloudAuthMode(mode) {
     ? '没有账号？<a href="#" onclick="setCloudAuthMode(\'register\');return false">去注册</a>'
     : '已有账号？<a href="#" onclick="setCloudAuthMode(\'login\');return false">去登录</a>';
   document.getElementById('cloud-auth-forgot').style.display = mode === 'login' ? '' : 'none';
+  const confirmGroup = document.getElementById('cloud-auth-confirm-group');
+  const pw2 = document.getElementById('cloud-auth-password2');
+  if (mode === 'register') {
+    confirmGroup.style.display = '';
+    pw2.required = true;
+  } else {
+    confirmGroup.style.display = 'none';
+    pw2.required = false;
+    pw2.value = '';
+  }
 }
 
 async function submitCloudAuth(e) {
@@ -174,6 +184,11 @@ async function submitCloudAuth(e) {
   errEl.textContent = '';
   submitBtn.disabled = true;
   submitBtn.textContent = '处理中...';
+
+  if (mode === 'register') {
+    const pw2 = document.getElementById('cloud-auth-password2').value;
+    if (password !== pw2) { errEl.textContent = '两次输入的密码不一致'; submitBtn.disabled = false; submitBtn.textContent = '注册'; return; }
+  }
 
   try {
     if (mode === 'register') {
