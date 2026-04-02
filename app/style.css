@@ -881,6 +881,83 @@ html, body {
 }
 .settings-btn:active { background: var(--bg); }
 .settings-btn.danger { color: var(--red); border-color: #FECACA; }
+.settings-btn.danger-text { color: var(--red); }
+.settings-section-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+  margin-bottom: -2px;
+}
+.settings-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+.settings-hint {
+  font-size: 12px;
+  color: var(--text3);
+  padding: 0 2px;
+  line-height: 1.5;
+}
+
+/* ===== Cloud Sync ===== */
+.cloud-user-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.cloud-user-email {
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+.cloud-sync-badge {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.cloud-sync-badge.done {
+  background: #D1FAE5;
+  color: #059669;
+}
+.cloud-sync-badge.syncing {
+  background: #DBEAFE;
+  color: #2563EB;
+}
+.cloud-sync-badge.error {
+  background: #FEE2E2;
+  color: #DC2626;
+}
+
+/* ===== Cloud Auth Modal ===== */
+.cloud-auth-error {
+  font-size: 13px;
+  color: var(--red);
+  min-height: 20px;
+  margin-bottom: 8px;
+}
+.cloud-auth-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--text2);
+}
+.cloud-auth-footer a {
+  color: var(--primary);
+  text-decoration: none;
+}
+.cloud-auth-footer a:hover { text-decoration: underline; }
 
 /* ===== Toast ===== */
 .toast {
@@ -1352,6 +1429,18 @@ html, body {
 [data-theme="dark"] .btn-step-save {
   background: #1F2937;
   border-color: var(--primary);
+}
+[data-theme="dark"] .cloud-sync-badge.done {
+  background: #064E3B;
+  color: #6EE7B7;
+}
+[data-theme="dark"] .cloud-sync-badge.syncing {
+  background: #1E3A5F;
+  color: #93C5FD;
+}
+[data-theme="dark"] .cloud-sync-badge.error {
+  background: #7F1D1D;
+  color: #FCA5A5;
 }
 [data-theme="dark"] .search-bar input,
 [data-theme="dark"] .search-filter-row input,

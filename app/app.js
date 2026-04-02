@@ -63,11 +63,13 @@ function saveCustomOption(groupId, label) {
   if (!all[groupId]) all[groupId] = [];
   if (!all[groupId].includes(label)) all[groupId].push(label);
   localStorage.setItem(CUSTOM_OPTIONS_KEY, JSON.stringify(all));
+  if (typeof triggerCloudSync === 'function') triggerCloudSync();
 }
 function removeCustomOption(groupId, label) {
   const all = JSON.parse(localStorage.getItem(CUSTOM_OPTIONS_KEY) || '{}');
   if (all[groupId]) all[groupId] = all[groupId].filter(v => v !== label);
   localStorage.setItem(CUSTOM_OPTIONS_KEY, JSON.stringify(all));
+  if (typeof triggerCloudSync === 'function') triggerCloudSync();
 }
 function renderCustomChips(groupId) {
   const group = document.getElementById(groupId);
@@ -93,6 +95,7 @@ function addRemovedDefault(groupId, value) {
   if (!all[groupId]) all[groupId] = [];
   if (!all[groupId].includes(value)) all[groupId].push(value);
   localStorage.setItem(REMOVED_DEFAULTS_KEY, JSON.stringify(all));
+  if (typeof triggerCloudSync === 'function') triggerCloudSync();
 }
 function makeDefaultChipsRemovable(groupId) {
   const group = document.getElementById(groupId);
@@ -139,7 +142,10 @@ function getData() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
   catch { return []; }
 }
-function saveData(records) { localStorage.setItem(STORAGE_KEY, JSON.stringify(records)); }
+function saveData(records, skipSync) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+  if (!skipSync && typeof triggerCloudSync === 'function') triggerCloudSync();
+}
 function getMigraines() { return getData().filter(r => r.type === 'migraine').sort((a, b) => b.startDate.localeCompare(a.startDate)); }
 function getPeriods() { return getData().filter(r => r.type === 'period').sort((a, b) => b.startDate.localeCompare(a.startDate)); }
 function addRecord(rec) { const d = getData(); d.push(rec); saveData(d); }
@@ -371,6 +377,7 @@ function showRecordPeriod(editRecord) {
 function showSettings() {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   document.getElementById('theme-toggle-label').textContent = isDark ? '切换浅色模式' : '切换暗色模式';
+  if (typeof updateCloudUI === 'function') updateCloudUI();
   openModal('modal-settings');
 }
 function toggleDarkMode() {
@@ -1485,6 +1492,8 @@ function init() {
   setupEventListeners();
   renderDashboard();
   checkBackupReminder();
+  if (typeof initFirebase === 'function') initFirebase();
+  if (typeof updateCloudUI === 'function') setTimeout(updateCloudUI, 100);
 }
 
 function setupEventListeners() {

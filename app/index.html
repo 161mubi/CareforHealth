@@ -401,6 +401,9 @@
           </button>
         </div>
         <div class="settings-body">
+          <div class="settings-section-label">☁️ 云端同步</div>
+          <div id="settings-cloud"></div>
+          <div class="settings-divider"></div>
           <button class="settings-btn" id="theme-toggle-btn" onclick="toggleDarkMode()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             <span id="theme-toggle-label">切换暗色模式</span>
@@ -459,6 +462,34 @@
       </div>
     </div>
 
+    <!-- Cloud Auth Modal -->
+    <div id="modal-cloud-auth" class="modal">
+      <div class="modal-content" style="border-radius:20px;max-width:360px;margin:auto">
+        <div class="modal-header">
+          <h2 id="cloud-auth-title">登录</h2>
+          <button class="icon-btn" onclick="closeModal('modal-cloud-auth')">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form id="cloud-auth-mode" data-mode="login" onsubmit="submitCloudAuth(event)">
+          <div class="form-group">
+            <label>邮箱</label>
+            <input type="email" id="cloud-auth-email" required placeholder="your@email.com">
+          </div>
+          <div class="form-group">
+            <label>密码</label>
+            <input type="password" id="cloud-auth-password" required placeholder="至少 6 位" minlength="6">
+          </div>
+          <div class="cloud-auth-error" id="cloud-auth-error"></div>
+          <button type="submit" class="btn-primary" id="cloud-auth-submit">登录</button>
+          <div class="cloud-auth-footer">
+            <span id="cloud-auth-switch">没有账号？<a href="#" onclick="setCloudAuthMode('register');return false">去注册</a></span>
+            <a href="#" id="cloud-auth-forgot" onclick="doForgotPassword();return false">忘记密码</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Toast -->
     <div id="toast" class="toast"></div>
     <!-- Undo Toast -->
@@ -468,6 +499,10 @@
     </div>
   </div>
 
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
   <script src="app.js"></script>
   <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>
