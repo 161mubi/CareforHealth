@@ -1403,7 +1403,7 @@ function updateAppTitle() {
   const title = document.getElementById('app-title');
   if (!title) return;
   if (typeof _fbUser !== 'undefined' && _fbUser) {
-    const name = _fbUser.email.split('@')[0];
+    const name = _fbUser.displayName || _fbUser.email.split('@')[0];
     title.textContent = name + ' 的健康日记';
   } else if (currentUser && currentUser !== 'default' && currentUser !== 'local') {
     title.textContent = currentUser + ' 的健康日记';

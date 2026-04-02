@@ -49,7 +49,12 @@ async function cloudLogin(email, password) {
 async function cloudLogout() {
   await _fbAuth.signOut();
   _fbUser = null;
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(CUSTOM_OPTIONS_KEY);
+  localStorage.removeItem(REMOVED_DEFAULTS_KEY);
   updateCloudUI();
+  updateAppTitle();
+  refreshCurrentView();
   showToast('已退出登录');
 }
 async function cloudResetPassword(email) {
@@ -165,13 +170,20 @@ function setCloudAuthMode(mode) {
   document.getElementById('cloud-auth-forgot').style.display = mode === 'login' ? '' : 'none';
   const confirmGroup = document.getElementById('cloud-auth-confirm-group');
   const pw2 = document.getElementById('cloud-auth-password2');
+  const nickGroup = document.getElementById('cloud-auth-nick-group');
+  const nickInput = document.getElementById('cloud-auth-nickname');
   if (mode === 'register') {
     confirmGroup.style.display = '';
     pw2.required = true;
+    nickGroup.style.display = '';
+    nickInput.required = true;
   } else {
     confirmGroup.style.display = 'none';
     pw2.required = false;
     pw2.value = '';
+    nickGroup.style.display = 'none';
+    nickInput.required = false;
+    nickInput.value = '';
   }
 }
 
@@ -191,9 +203,17 @@ async function submitCloudAuth(e) {
     if (password !== pw2) { errEl.textContent = '两次输入的密码不一致'; submitBtn.disabled = false; submitBtn.textContent = '注册'; return; }
   }
 
+  const nickname = document.getElementById('cloud-auth-nickname').value.trim();
+
   try {
     if (mode === 'register') {
-      await cloudRegister(email, password);
+      const cred = await cloudRegister(email, password);
+      if (nickname && cred.user) {
+        await cred.user.updateProfile({ displayName: nickname });
+        await cred.user.reload();
+        _fbUser = _fbAuth.currentUser;
+        updateAppTitle();
+      }
       showToast('注册成功，数据将自动同步到云端');
     } else {
       await cloudLogin(email, password);
@@ -243,10 +263,18 @@ function updateCloudUI() {
   }
 
   if (_fbUser) {
+    const displayName = _fbUser.displayName || '';
     authSection.innerHTML = `
       <div class="cloud-user-info">
-        <span class="cloud-user-email">☁️ ${esc(_fbUser.email)}</span>
+        <span class="cloud-user-email">☁️ ${displayName ? esc(displayName) + '（' + esc(_fbUser.email) + '）' : esc(_fbUser.email)}</span>
         <span class="cloud-sync-badge" id="sync-badge">已连接</span>
+      </div>
+      <div class="settings-nickname-row">
+        <label>昵称</label>
+        <div class="nickname-edit">
+          <input type="text" id="settings-nickname" value="${esc(displayName)}" placeholder="设置昵称" maxlength="20">
+          <button class="nickname-save-btn" onclick="saveNickname()">保存</button>
+        </div>
       </div>
       <button class="settings-btn" onclick="syncFromCloud()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
@@ -262,6 +290,20 @@ function updateCloudUI() {
       </button>
       <div class="settings-hint">登录后数据自动同步到云端，跨设备访问、永不丢失</div>
     `;
+  }
+}
+
+async function saveNickname() {
+  if (!_fbUser) return;
+  const name = document.getElementById('settings-nickname').value.trim();
+  try {
+    await _fbUser.updateProfile({ displayName: name });
+    await _fbUser.reload();
+    _fbUser = _fbAuth.currentUser;
+    updateAppTitle();
+    showToast(name ? `昵称已更新为「${name}」` : '昵称已清除');
+  } catch (e) {
+    showToast('更新失败，请重试');
   }
 }
 

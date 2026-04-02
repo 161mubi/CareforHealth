@@ -467,6 +467,10 @@
           <p class="auth-subtitle" id="cloud-auth-subtitle">登录后数据自动同步云端</p>
         </div>
         <form id="cloud-auth-mode" data-mode="login" onsubmit="submitCloudAuth(event)">
+          <div class="form-group" id="cloud-auth-nick-group" style="display:none">
+            <label>昵称</label>
+            <input type="text" id="cloud-auth-nickname" placeholder="你的名字" maxlength="20" autocomplete="name">
+          </div>
           <div class="form-group">
             <label>邮箱</label>
             <input type="email" id="cloud-auth-email" required placeholder="your@email.com" autocomplete="email">
