@@ -7,6 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#7C3AED">
   <title>偏头痛 & 经期记录</title>
+  <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -47,7 +48,7 @@
         <button class="icon-btn" onclick="calendarPrev()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <h1 id="calendar-title">2026年3月</h1>
+        <h1 id="calendar-title" onclick="showCalendarJump()" style="cursor:pointer">2026年3月</h1>
         <button class="icon-btn" onclick="calendarNext()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
@@ -76,6 +77,30 @@
           <button class="filter-tab" data-filter="migraine" onclick="filterHistory('migraine',this)">偏头痛</button>
           <button class="filter-tab" data-filter="period" onclick="filterHistory('period',this)">经期</button>
         </div>
+        <div class="search-bar">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="history-search" placeholder="搜索关键词、部位、诱因…" oninput="applyHistoryFilters()">
+        </div>
+        <div class="search-filters">
+          <div class="search-filter-row">
+            <label>日期范围</label>
+            <input type="date" id="search-date-from" onchange="applyHistoryFilters()">
+            <span style="color:var(--text3)">至</span>
+            <input type="date" id="search-date-to" onchange="applyHistoryFilters()">
+          </div>
+          <div class="search-filter-row">
+            <label>严重程度</label>
+            <select id="search-severity" onchange="applyHistoryFilters()">
+              <option value="">全部</option>
+              <option value="1">1 - 轻度</option>
+              <option value="2">2 - 轻中度</option>
+              <option value="3">3 - 中度</option>
+              <option value="4">4 - 中重度</option>
+              <option value="5">5 - 重度</option>
+            </select>
+          </div>
+        </div>
+        <div id="history-count" class="history-count"></div>
         <div id="history-list"></div>
       </div>
     </section>
@@ -118,193 +143,197 @@
           </button>
         </div>
         <form id="form-migraine" onsubmit="saveMigraine(event)">
-
-          <div class="form-section-label">时间信息</div>
-          <div class="form-group">
-            <label>发作开始</label>
-            <input type="datetime-local" id="m-start-dt" required>
-          </div>
-          <div class="form-group">
-            <label>发作结束（可稍后补填）</label>
-            <input type="datetime-local" id="m-end-dt">
-          </div>
-          <div class="form-group">
-            <label>持续时长</label>
-            <div class="duration-display" id="m-duration-display">填写开始和结束时间后自动计算</div>
-            <input type="hidden" id="m-duration-val">
-          </div>
-
-          <div class="form-section-label">头痛详情</div>
-          <div class="form-group">
-            <label>疼痛部位（可多选）</label>
-            <div class="chip-group" id="m-locations">
-              <button type="button" class="chip" data-value="left">左侧</button>
-              <button type="button" class="chip" data-value="right">右侧</button>
-              <button type="button" class="chip" data-value="top">头顶</button>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>严重程度</label>
-            <div class="severity-picker" id="m-severity">
-              <button type="button" class="severity-btn" data-value="1"><span class="severity-dot s1"></span>轻度</button>
-              <button type="button" class="severity-btn" data-value="2"><span class="severity-dot s2"></span>轻中度</button>
-              <button type="button" class="severity-btn" data-value="3"><span class="severity-dot s3"></span>中度</button>
-              <button type="button" class="severity-btn" data-value="4"><span class="severity-dot s4"></span>中重度</button>
-              <button type="button" class="severity-btn" data-value="5"><span class="severity-dot s5"></span>重度</button>
-            </div>
-          </div>
-
-          <div class="form-section-label">伴随与前驱症状</div>
-          <div class="form-group">
-            <label>伴随症状（可多选）</label>
-            <div class="chip-group" id="m-symptoms">
-              <button type="button" class="chip" data-value="vomiting">呕吐</button>
-              <button type="button" class="chip" data-value="nausea">恶心</button>
-              <button type="button" class="chip" data-value="photophobia">怕光</button>
-              <button type="button" class="chip" data-value="phonophobia">怕声音</button>
-              <button type="button" class="chip" data-value="appetite_loss">食欲下降</button>
-              <button type="button" class="chip" data-value="dizziness">头晕</button>
-              <button type="button" class="chip" data-value="nasal">鼻部不适</button>
-              <button type="button" class="chip" data-value="diarrhea">腹泻</button>
-              <button type="button" class="chip" data-value="heavy_head">脑袋昏沉</button>
-              <button type="button" class="chip chip-add-other" data-for="m-symptoms">+ 其他</button>
-            </div>
-            <div class="custom-input-row hidden" data-for="m-symptoms">
-              <input type="text" placeholder="输入自定义选项..." maxlength="20">
-              <button type="button" class="custom-input-add" data-for="m-symptoms">添加</button>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>前驱症状（可多选）</label>
-            <div class="chip-group" id="m-prodromal">
-              <button type="button" class="chip" data-value="drowsy">极度困倦/打呵欠</button>
-              <button type="button" class="chip" data-value="chills">畏寒/打寒颤</button>
-              <button type="button" class="chip" data-value="sneeze">打喷嚏</button>
-              <button type="button" class="chip" data-value="runny_nose">流清水鼻涕</button>
-              <button type="button" class="chip" data-value="head_foggy">头部轻微不适/懵感</button>
-              <button type="button" class="chip" data-value="head_swell">轻微头胀</button>
-              <button type="button" class="chip chip-add-other" data-for="m-prodromal">+ 其他</button>
-            </div>
-            <div class="custom-input-row hidden" data-for="m-prodromal">
-              <input type="text" placeholder="输入自定义选项..." maxlength="20">
-              <button type="button" class="custom-input-add" data-for="m-prodromal">添加</button>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>头痛后的症状</label>
-            <textarea id="m-post-symptoms" rows="2" placeholder="头痛缓解后的残余症状，如头沉、懵痛感等..."></textarea>
-          </div>
-          <div class="form-group">
-            <label>头痛后症状持续时间（小时）</label>
-            <input type="number" id="m-post-duration" min="0" step="0.5" placeholder="例如: 4">
-          </div>
-
-          <div class="form-section-label">诱因与环境</div>
-          <div class="form-group">
-            <label>可能诱因（可多选）</label>
-            <div class="chip-group" id="m-triggers">
-              <button type="button" class="chip" data-value="fatigue">劳累/疲惫</button>
-              <button type="button" class="chip" data-value="screen">用眼/注意力集中</button>
-              <button type="button" class="chip" data-value="period">生理期相关</button>
-              <button type="button" class="chip" data-value="sleep">睡眠不足</button>
-              <button type="button" class="chip" data-value="weather">天气变化</button>
-              <button type="button" class="chip" data-value="emotion">情绪波动</button>
-              <button type="button" class="chip" data-value="cold">受寒/吹风</button>
-              <button type="button" class="chip" data-value="talking">说话过多</button>
-              <button type="button" class="chip" data-value="smell">气味刺激</button>
-              <button type="button" class="chip chip-add-other" data-for="m-triggers">+ 其他</button>
-            </div>
-            <div class="custom-input-row hidden" data-for="m-triggers">
-              <input type="text" placeholder="输入自定义选项..." maxlength="20">
-              <button type="button" class="custom-input-add" data-for="m-triggers">添加</button>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>当日天气（可多选）</label>
-            <div class="chip-group" id="m-weather">
-              <button type="button" class="chip" data-value="sunny">晴</button>
-              <button type="button" class="chip" data-value="cloudy">多云</button>
-              <button type="button" class="chip" data-value="overcast">阴</button>
-              <button type="button" class="chip" data-value="rainy">雨</button>
-              <button type="button" class="chip" data-value="hot">闷热</button>
-              <button type="button" class="chip" data-value="cold_w">寒冷</button>
-              <button type="button" class="chip" data-value="windy">大风</button>
-              <button type="button" class="chip" data-value="humid">潮湿</button>
-              <button type="button" class="chip chip-add-other" data-for="m-weather">+ 其他</button>
-            </div>
-            <div class="custom-input-row hidden" data-for="m-weather">
-              <input type="text" placeholder="输入自定义选项..." maxlength="20">
-              <button type="button" class="custom-input-add" data-for="m-weather">添加</button>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>当天睡眠时间（小时）</label>
-            <input type="number" id="m-sleep" min="0" max="24" step="0.5" placeholder="例如: 7">
-          </div>
-          <div class="form-group">
-            <label>发作前 24 小时内的饮食</label>
-            <textarea id="m-diet" rows="2" placeholder="记录发作前吃了什么..."></textarea>
-          </div>
-
-          <div class="form-section-label">缓解与用药</div>
-          <div class="form-group">
-            <label>缓解方法（可多选）</label>
-            <div class="chip-group" id="m-relief">
-              <button type="button" class="chip" data-value="sleep">睡觉/休息</button>
-              <button type="button" class="chip" data-value="hot_wash">洗热水头/澡</button>
-              <button type="button" class="chip" data-value="taichong">按压太冲穴</button>
-              <button type="button" class="chip" data-value="massage">按摩</button>
-              <button type="button" class="chip" data-value="footbath">泡脚</button>
-              <button type="button" class="chip" data-value="huoxiang">藿香正气散</button>
-              <button type="button" class="chip" data-value="comb">梳头</button>
-              <button type="button" class="chip" data-value="sneeze">取嚏法</button>
-              <button type="button" class="chip" data-value="sun">晒太阳</button>
-              <button type="button" class="chip" data-value="music">听音乐/金刚经</button>
-              <button type="button" class="chip chip-add-other" data-for="m-relief">+ 其他</button>
-            </div>
-            <div class="custom-input-row hidden" data-for="m-relief">
-              <input type="text" placeholder="输入自定义选项..." maxlength="20">
-              <button type="button" class="custom-input-add" data-for="m-relief">添加</button>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>是否服用止痛药</label>
-            <div class="chip-group single-select" id="m-med-taken">
-              <button type="button" class="chip" data-value="yes">是</button>
-              <button type="button" class="chip" data-value="no">否</button>
-            </div>
-          </div>
-          <div id="m-med-details" class="med-details hidden">
-            <div class="form-group">
-              <label>药物名称</label>
-              <input type="text" id="m-med-name" placeholder="例如: 布洛芬">
-            </div>
-            <div class="form-row">
-              <div class="form-group" style="flex:1">
-                <label>剂量</label>
-                <input type="text" id="m-med-dosage" placeholder="例如: 400mg">
-              </div>
-              <div class="form-group" style="flex:1">
-                <label>服用时间</label>
-                <input type="time" id="m-med-time">
-              </div>
-            </div>
-            <div class="form-group">
-              <label>药物是否有效</label>
-              <div class="chip-group single-select" id="m-med-effective">
-                <button type="button" class="chip" data-value="effective">有效</button>
-                <button type="button" class="chip" data-value="partial">部分有效</button>
-                <button type="button" class="chip" data-value="ineffective">无效</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>备注</label>
-            <textarea id="m-notes" rows="2" placeholder="补充说明..."></textarea>
-          </div>
           <input type="hidden" id="m-edit-id">
-          <button type="submit" class="btn-primary">保存记录</button>
+
+          <!-- Step indicators -->
+          <div class="step-indicators">
+            <button type="button" class="step-dot active" data-step="1" onclick="goToStep(1)"><span>1</span></button>
+            <div class="step-line"></div>
+            <button type="button" class="step-dot" data-step="2" onclick="goToStep(2)"><span>2</span></button>
+            <div class="step-line"></div>
+            <button type="button" class="step-dot" data-step="3" onclick="goToStep(3)"><span>3</span></button>
+          </div>
+          <div class="step-title" id="step-title">第 1 步 · 基本信息</div>
+
+          <!-- Step 1: Core -->
+          <div class="form-step active" data-step="1">
+            <div class="form-group">
+              <label>发作开始</label>
+              <input type="datetime-local" id="m-start-dt" required>
+            </div>
+            <div class="form-group">
+              <label>发作结束（可后续补填）</label>
+              <input type="datetime-local" id="m-end-dt">
+            </div>
+            <div class="form-group">
+              <label>持续时长</label>
+              <div class="duration-display" id="m-duration-display">填写开始和结束时间后自动计算</div>
+              <input type="hidden" id="m-duration-val">
+            </div>
+            <div class="form-group">
+              <label>疼痛部位（可多选）</label>
+              <div class="chip-group" id="m-locations">
+                <button type="button" class="chip" data-value="left">左侧</button>
+                <button type="button" class="chip" data-value="right">右侧</button>
+                <button type="button" class="chip" data-value="top">头顶</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>严重程度</label>
+              <div class="severity-picker" id="m-severity">
+                <button type="button" class="severity-btn" data-value="1"><span class="severity-dot s1"></span>轻度</button>
+                <button type="button" class="severity-btn" data-value="2"><span class="severity-dot s2"></span>轻中度</button>
+                <button type="button" class="severity-btn" data-value="3"><span class="severity-dot s3"></span>中度</button>
+                <button type="button" class="severity-btn" data-value="4"><span class="severity-dot s4"></span>中重度</button>
+                <button type="button" class="severity-btn" data-value="5"><span class="severity-dot s5"></span>重度</button>
+              </div>
+            </div>
+            <div class="step-actions">
+              <button type="button" class="btn-step-save" onclick="saveMigraine(event)">直接保存</button>
+              <button type="button" class="btn-step-next" onclick="goToStep(2)">下一步 →</button>
+            </div>
+            <p class="step-hint">着急时可直接保存，有时间再补充详情</p>
+          </div>
+
+          <!-- Step 2: Symptoms & Triggers -->
+          <div class="form-step" data-step="2">
+            <div class="form-group">
+              <label>伴随症状（可多选）</label>
+              <div class="chip-group" id="m-symptoms">
+                <button type="button" class="chip" data-value="vomiting">呕吐</button>
+                <button type="button" class="chip" data-value="nausea">恶心</button>
+                <button type="button" class="chip" data-value="photophobia">怕光</button>
+                <button type="button" class="chip" data-value="phonophobia">怕声音</button>
+                <button type="button" class="chip" data-value="appetite_loss">食欲下降</button>
+                <button type="button" class="chip" data-value="dizziness">头晕</button>
+                <button type="button" class="chip" data-value="nasal">鼻部不适</button>
+                <button type="button" class="chip" data-value="diarrhea">腹泻</button>
+                <button type="button" class="chip" data-value="heavy_head">脑袋昏沉</button>
+                <button type="button" class="chip chip-add-other" data-for="m-symptoms">+ 其他</button>
+              </div>
+              <div class="custom-input-row hidden" data-for="m-symptoms">
+                <input type="text" placeholder="输入自定义选项..." maxlength="20">
+                <button type="button" class="custom-input-add" data-for="m-symptoms">添加</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>前驱症状（可多选）</label>
+              <div class="chip-group" id="m-prodromal">
+                <button type="button" class="chip" data-value="drowsy">极度困倦/打呵欠</button>
+                <button type="button" class="chip" data-value="chills">畏寒/打寒颤</button>
+                <button type="button" class="chip" data-value="sneeze">打喷嚏</button>
+                <button type="button" class="chip" data-value="runny_nose">流清水鼻涕</button>
+                <button type="button" class="chip" data-value="head_foggy">头部轻微不适/懵感</button>
+                <button type="button" class="chip" data-value="head_swell">轻微头胀</button>
+                <button type="button" class="chip chip-add-other" data-for="m-prodromal">+ 其他</button>
+              </div>
+              <div class="custom-input-row hidden" data-for="m-prodromal">
+                <input type="text" placeholder="输入自定义选项..." maxlength="20">
+                <button type="button" class="custom-input-add" data-for="m-prodromal">添加</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>可能诱因（可多选）</label>
+              <div class="chip-group" id="m-triggers">
+                <button type="button" class="chip" data-value="fatigue">劳累/疲惫</button>
+                <button type="button" class="chip" data-value="screen">用眼/注意力集中</button>
+                <button type="button" class="chip" data-value="period">生理期相关</button>
+                <button type="button" class="chip" data-value="sleep">睡眠不足</button>
+                <button type="button" class="chip" data-value="weather">天气变化</button>
+                <button type="button" class="chip" data-value="emotion">情绪波动</button>
+                <button type="button" class="chip" data-value="cold">受寒/吹风</button>
+                <button type="button" class="chip" data-value="talking">说话过多</button>
+                <button type="button" class="chip" data-value="smell">气味刺激</button>
+                <button type="button" class="chip chip-add-other" data-for="m-triggers">+ 其他</button>
+              </div>
+              <div class="custom-input-row hidden" data-for="m-triggers">
+                <input type="text" placeholder="输入自定义选项..." maxlength="20">
+                <button type="button" class="custom-input-add" data-for="m-triggers">添加</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>当日天气（可多选）</label>
+              <div class="chip-group" id="m-weather">
+                <button type="button" class="chip" data-value="sunny">晴</button>
+                <button type="button" class="chip" data-value="cloudy">多云</button>
+                <button type="button" class="chip" data-value="overcast">阴</button>
+                <button type="button" class="chip" data-value="rainy">雨</button>
+                <button type="button" class="chip" data-value="hot">闷热</button>
+                <button type="button" class="chip" data-value="cold_w">寒冷</button>
+                <button type="button" class="chip" data-value="windy">大风</button>
+                <button type="button" class="chip" data-value="humid">潮湿</button>
+                <button type="button" class="chip chip-add-other" data-for="m-weather">+ 其他</button>
+              </div>
+              <div class="custom-input-row hidden" data-for="m-weather">
+                <input type="text" placeholder="输入自定义选项..." maxlength="20">
+                <button type="button" class="custom-input-add" data-for="m-weather">添加</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>当天睡眠时间（小时）</label>
+              <input type="number" id="m-sleep" min="0" max="24" step="0.5" placeholder="例如: 7">
+            </div>
+            <div class="form-group">
+              <label>发作前 24 小时内的饮食</label>
+              <textarea id="m-diet" rows="2" placeholder="记录发作前吃了什么..."></textarea>
+            </div>
+            <div class="step-actions">
+              <button type="button" class="btn-step-prev" onclick="goToStep(1)">← 上一步</button>
+              <button type="button" class="btn-step-next" onclick="goToStep(3)">下一步 →</button>
+            </div>
+          </div>
+
+          <!-- Step 3: Relief & Medication -->
+          <div class="form-step" data-step="3">
+            <div class="form-group">
+              <label>缓解方法（可多选）</label>
+              <div class="chip-group" id="m-relief">
+                <button type="button" class="chip" data-value="sleep">睡觉/休息</button>
+                <button type="button" class="chip" data-value="hot_wash">洗热水头/澡</button>
+                <button type="button" class="chip" data-value="taichong">按压太冲穴</button>
+                <button type="button" class="chip" data-value="massage">按摩</button>
+                <button type="button" class="chip" data-value="footbath">泡脚</button>
+                <button type="button" class="chip" data-value="huoxiang">藿香正气散</button>
+                <button type="button" class="chip" data-value="comb">梳头</button>
+                <button type="button" class="chip" data-value="sneeze">取嚏法</button>
+                <button type="button" class="chip" data-value="sun">晒太阳</button>
+                <button type="button" class="chip" data-value="music">听音乐/金刚经</button>
+                <button type="button" class="chip chip-add-other" data-for="m-relief">+ 其他</button>
+              </div>
+              <div class="custom-input-row hidden" data-for="m-relief">
+                <input type="text" placeholder="输入自定义选项..." maxlength="20">
+                <button type="button" class="custom-input-add" data-for="m-relief">添加</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>是否服用止痛药</label>
+              <div class="chip-group single-select" id="m-med-taken">
+                <button type="button" class="chip" data-value="yes">是</button>
+                <button type="button" class="chip" data-value="no">否</button>
+              </div>
+            </div>
+            <div id="m-med-details" class="med-details hidden">
+              <div id="m-med-list"></div>
+              <button type="button" class="btn-add-med" onclick="addMedEntry()">+ 添加药物</button>
+            </div>
+            <div class="form-group">
+              <label>头痛后的症状</label>
+              <textarea id="m-post-symptoms" rows="2" placeholder="头痛缓解后的残余症状，如头沉、懵痛感等..."></textarea>
+            </div>
+            <div class="form-group">
+              <label>头痛后症状持续时间（小时）</label>
+              <input type="number" id="m-post-duration" min="0" step="0.5" placeholder="例如: 4">
+            </div>
+            <div class="form-group">
+              <label>备注</label>
+              <textarea id="m-notes" rows="2" placeholder="补充说明..."></textarea>
+            </div>
+            <div class="step-actions">
+              <button type="button" class="btn-step-prev" onclick="goToStep(2)">← 上一步</button>
+              <button type="submit" class="btn-step-next btn-step-submit">保存记录</button>
+            </div>
+          </div>
+
         </form>
       </div>
     </div>
@@ -372,6 +401,10 @@
           </button>
         </div>
         <div class="settings-body">
+          <button class="settings-btn" id="theme-toggle-btn" onclick="toggleDarkMode()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            <span id="theme-toggle-label">切换暗色模式</span>
+          </button>
           <button class="settings-btn" onclick="exportData()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             导出数据 (JSON)
@@ -409,10 +442,33 @@
       </div>
     </div>
 
+    <!-- Calendar Jump Modal -->
+    <div id="modal-cal-jump" class="modal">
+      <div class="modal-content" style="border-radius:20px;max-width:320px;margin:auto">
+        <div class="modal-header">
+          <h2>跳转到</h2>
+          <button class="icon-btn" onclick="closeModal('modal-cal-jump')">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div style="display:flex;gap:10px;padding:0 0 8px">
+          <select id="cal-jump-year" class="year-select" style="flex:1;font-size:16px;padding:10px"></select>
+          <select id="cal-jump-month" class="year-select" style="flex:1;font-size:16px;padding:10px"></select>
+        </div>
+        <button class="btn-primary" onclick="doCalendarJump()">确定</button>
+      </div>
+    </div>
+
     <!-- Toast -->
     <div id="toast" class="toast"></div>
+    <!-- Undo Toast -->
+    <div id="toast-undo" class="toast-undo">
+      <span id="toast-undo-msg"></span>
+      <button class="toast-undo-btn" onclick="undoDelete()">撤销</button>
+    </div>
   </div>
 
   <script src="app.js"></script>
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>
 </html>

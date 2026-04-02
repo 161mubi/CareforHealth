@@ -80,7 +80,7 @@ function renderCustomChips(groupId) {
     chip.type = 'button';
     chip.className = 'chip chip-custom';
     chip.dataset.value = label;
-    chip.innerHTML = `<span class="chip-text">${label}</span><span class="chip-remove" data-group="${groupId}" data-label="${label}">&times;</span>`;
+    chip.innerHTML = `<span class="chip-text">${esc(label)}</span><span class="chip-remove" data-group="${esc(groupId)}" data-label="${esc(label)}">&times;</span>`;
     group.insertBefore(chip, addBtn);
   });
 }
@@ -145,6 +145,31 @@ function getPeriods() { return getData().filter(r => r.type === 'period').sort((
 function addRecord(rec) { const d = getData(); d.push(rec); saveData(d); }
 function updateRecord(rec) { const d = getData(); const i = d.findIndex(r => r.id === rec.id); if (i >= 0) d[i] = rec; saveData(d); }
 function deleteRecord(id) { saveData(getData().filter(r => r.id !== id)); }
+let _pendingDelete = null;
+let _undoTimer = null;
+function softDeleteRecord(rec) {
+  _pendingDelete = JSON.parse(JSON.stringify(rec));
+  deleteRecord(rec.id);
+  refreshCurrentView();
+  const label = rec.type === 'migraine' ? '偏头痛记录' : '经期记录';
+  const el = document.getElementById('toast-undo');
+  document.getElementById('toast-undo-msg').textContent = `已删除${label}`;
+  el.classList.add('show');
+  clearTimeout(_undoTimer);
+  _undoTimer = setTimeout(() => {
+    el.classList.remove('show');
+    _pendingDelete = null;
+  }, 5000);
+}
+function undoDelete() {
+  if (!_pendingDelete) return;
+  addRecord(_pendingDelete);
+  _pendingDelete = null;
+  clearTimeout(_undoTimer);
+  document.getElementById('toast-undo').classList.remove('show');
+  showToast('已撤销删除');
+  refreshCurrentView();
+}
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
 function migrateData() {
@@ -172,6 +197,10 @@ function migrateData() {
 }
 
 // ===== UTIL =====
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 function fmtDate(d) {
   if (!d) return '';
   const dt = new Date(d + 'T00:00:00');
@@ -271,8 +300,11 @@ function showRecordMigraine(editRecord) {
   document.getElementById('m-edit-id').value = '';
   clearChips('m-locations'); clearChips('m-triggers'); clearChips('m-relief');
   clearChips('m-symptoms'); clearChips('m-prodromal'); clearChips('m-weather');
-  clearChips('m-med-taken'); clearChips('m-med-effective'); clearSeverity();
+  clearChips('m-med-taken'); clearSeverity();
   document.getElementById('m-med-details').classList.add('hidden');
+  document.getElementById('m-med-list').innerHTML = '';
+  medEntryCounter = 0;
+  goToStep(1);
   ['m-symptoms','m-prodromal','m-triggers','m-weather','m-relief'].forEach(gid => {
     makeDefaultChipsRemovable(gid);
     renderCustomChips(gid);
@@ -304,13 +336,13 @@ function showRecordMigraine(editRecord) {
     document.getElementById('m-post-symptoms').value = editRecord.postSymptoms || '';
     document.getElementById('m-post-duration').value = editRecord.postSymptomsDuration ?? '';
     document.getElementById('m-notes').value = editRecord.notes || '';
-    if (editRecord.medication) {
+    const meds = editRecord.medications && editRecord.medications.length
+      ? editRecord.medications
+      : (editRecord.medication ? [editRecord.medication] : []);
+    if (meds.length) {
       setSingleChip('m-med-taken', 'yes');
       document.getElementById('m-med-details').classList.remove('hidden');
-      document.getElementById('m-med-name').value = editRecord.medication.name || '';
-      document.getElementById('m-med-dosage').value = editRecord.medication.dosage || '';
-      document.getElementById('m-med-time').value = editRecord.medication.time || '';
-      if (editRecord.medication.effective) setSingleChip('m-med-effective', editRecord.medication.effective);
+      meds.forEach(m => addMedEntry(m));
     }
     calcDuration();
   } else {
@@ -336,7 +368,28 @@ function showRecordPeriod(editRecord) {
   }
   openModal('modal-period');
 }
-function showSettings() { openModal('modal-settings'); }
+function showSettings() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.getElementById('theme-toggle-label').textContent = isDark ? '切换浅色模式' : '切换暗色模式';
+  openModal('modal-settings');
+}
+function toggleDarkMode() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const next = isDark ? '' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('migraine_theme', next);
+  document.getElementById('theme-toggle-label').textContent = next === 'dark' ? '切换浅色模式' : '切换暗色模式';
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', next === 'dark' ? '#111827' : '#7C3AED');
+}
+function loadTheme() {
+  const saved = localStorage.getItem('migraine_theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta && saved === 'dark') meta.setAttribute('content', '#111827');
+  }
+}
 
 // ===== CHIPS =====
 function clearChips(groupId) {
@@ -373,6 +426,102 @@ function getSeverity() {
   return btn ? parseInt(btn.dataset.value) : 0;
 }
 
+// ===== STEP FORM =====
+let currentStep = 1;
+const STEP_TITLES = { 1: '第 1 步 · 基本信息', 2: '第 2 步 · 症状与诱因', 3: '第 3 步 · 缓解与用药' };
+
+function goToStep(step) {
+  if (step > currentStep && step >= 2) {
+    const severity = getSeverity();
+    if (!severity) { showToast('请先选择严重程度'); return; }
+    const locations = getChips('m-locations');
+    if (!locations.length) { showToast('请先选择疼痛部位'); return; }
+  }
+  currentStep = step;
+  document.querySelectorAll('.form-step').forEach(s => s.classList.toggle('active', parseInt(s.dataset.step) === step));
+  document.querySelectorAll('.step-dot').forEach(d => {
+    const s = parseInt(d.dataset.step);
+    d.classList.toggle('active', s === step);
+    d.classList.toggle('done', s < step);
+  });
+  document.querySelectorAll('.step-line').forEach((line, i) => {
+    line.classList.toggle('done', i + 1 < step);
+  });
+  document.getElementById('step-title').textContent = STEP_TITLES[step];
+  document.querySelector('#modal-migraine .modal-content').scrollTop = 0;
+}
+
+// ===== MULTI-MED =====
+let medEntryCounter = 0;
+function addMedEntry(data) {
+  const list = document.getElementById('m-med-list');
+  const idx = medEntryCounter++;
+  const entry = document.createElement('div');
+  entry.className = 'med-entry';
+  entry.dataset.medIdx = idx;
+  entry.innerHTML = `
+    <div class="med-entry-header">
+      <span>药物 #${list.children.length + 1}</span>
+      <button type="button" class="med-entry-remove" onclick="removeMedEntry(this)">&times;</button>
+    </div>
+    <div class="form-group">
+      <label>药物名称</label>
+      <input type="text" class="med-name" placeholder="例如: 布洛芬" value="${esc(data?.name || '')}">
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label>剂量</label>
+        <input type="text" class="med-dosage" placeholder="例如: 400mg" value="${esc(data?.dosage || '')}">
+      </div>
+      <div class="form-group" style="flex:1">
+        <label>服用时间</label>
+        <input type="time" class="med-time" value="${data?.time || ''}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>药物是否有效</label>
+      <div class="chip-group single-select med-effective">
+        <button type="button" class="chip${data?.effective === 'effective' ? ' active' : ''}" data-value="effective">有效</button>
+        <button type="button" class="chip${data?.effective === 'partial' ? ' active' : ''}" data-value="partial">部分有效</button>
+        <button type="button" class="chip${data?.effective === 'ineffective' ? ' active' : ''}" data-value="ineffective">无效</button>
+      </div>
+    </div>
+  `;
+  list.appendChild(entry);
+  entry.querySelectorAll('.med-effective').forEach(g => {
+    g.addEventListener('click', e => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      g.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+    });
+  });
+}
+function removeMedEntry(btn) {
+  const entry = btn.closest('.med-entry');
+  entry.remove();
+  renumberMedEntries();
+}
+function renumberMedEntries() {
+  document.querySelectorAll('#m-med-list .med-entry').forEach((e, i) => {
+    e.querySelector('.med-entry-header span').textContent = `药物 #${i + 1}`;
+  });
+}
+function getMedications() {
+  const entries = document.querySelectorAll('#m-med-list .med-entry');
+  const meds = [];
+  entries.forEach(entry => {
+    const effBtn = entry.querySelector('.med-effective .chip.active');
+    meds.push({
+      name: entry.querySelector('.med-name').value.trim(),
+      dosage: entry.querySelector('.med-dosage').value.trim(),
+      time: entry.querySelector('.med-time').value,
+      effective: effBtn ? effBtn.dataset.value : '',
+    });
+  });
+  return meds;
+}
+
 // ===== DURATION CALC =====
 function calcDuration() {
   const startVal = document.getElementById('m-start-dt').value;
@@ -397,13 +546,14 @@ function calcDuration() {
 
 // ===== SAVE FORMS =====
 function saveMigraine(e) {
-  e.preventDefault();
+  if (e) e.preventDefault();
   const severity = getSeverity();
   if (!severity) { showToast('请选择严重程度'); return; }
   const locations = getChips('m-locations');
   if (!locations.length) { showToast('请选择疼痛部位'); return; }
 
   const startDtVal = document.getElementById('m-start-dt').value;
+  if (!startDtVal) { showToast('请选择发作时间'); return; }
   const endDtVal = document.getElementById('m-end-dt').value;
   const startDate = startDtVal.slice(0, 10);
   const startTime = startDtVal.slice(11, 16);
@@ -412,13 +562,10 @@ function saveMigraine(e) {
   const durationHours = parseFloat(document.getElementById('m-duration-val').value) || null;
 
   let medication = null;
+  let medications = [];
   if (getSingleChip('m-med-taken') === 'yes') {
-    medication = {
-      name: document.getElementById('m-med-name').value.trim(),
-      dosage: document.getElementById('m-med-dosage').value.trim(),
-      time: document.getElementById('m-med-time').value,
-      effective: getSingleChip('m-med-effective'),
-    };
+    medications = getMedications();
+    if (medications.length) medication = medications[0];
   }
 
   const rec = {
@@ -436,6 +583,7 @@ function saveMigraine(e) {
     postSymptoms: document.getElementById('m-post-symptoms').value.trim(),
     postSymptomsDuration: parseFloat(document.getElementById('m-post-duration').value) || null,
     medication,
+    medications,
     notes: document.getElementById('m-notes').value.trim(),
   };
   if (document.getElementById('m-edit-id').value) updateRecord(rec);
@@ -539,11 +687,11 @@ function renderRecordCard(r) {
     return `<div class="record-card" onclick='showDetail(${JSON.stringify(r.id)})'>
       <div class="card-header">
         <span class="card-badge migraine"></span>
-        <span class="card-date">${dateDisplay}</span>
-        <span class="card-severity" style="background:${sevBg}20;color:${sevTxt}">${sevLabel}</span>
+        <span class="card-date">${esc(dateDisplay)}</span>
+        <span class="card-severity" style="background:${sevBg}20;color:${sevTxt}">${esc(sevLabel)}</span>
       </div>
-      <div class="card-body">${locs}${relation ? ' · ' + relation : ''}</div>
-      ${(r.triggers && r.triggers.length) ? `<div class="card-tags">${r.triggers.map(t => `<span class="card-tag">${LABELS.trigger[t] || t}</span>`).join('')}</div>` : ''}
+      <div class="card-body">${esc(locs)}${relation ? ' · ' + esc(relation) : ''}</div>
+      ${(r.triggers && r.triggers.length) ? `<div class="card-tags">${r.triggers.map(t => `<span class="card-tag">${esc(LABELS.trigger[t] || t)}</span>`).join('')}</div>` : ''}
     </div>`;
   } else {
     const dur = r.duration ? `${r.duration}天` : '';
@@ -551,10 +699,10 @@ function renderRecordCard(r) {
     return `<div class="record-card" onclick='showDetail(${JSON.stringify(r.id)})'>
       <div class="card-header">
         <span class="card-badge period"></span>
-        <span class="card-date">${fmtDate(r.startDate)} ${fmtWeekday(r.startDate)}</span>
+        <span class="card-date">${esc(fmtDate(r.startDate))} ${esc(fmtWeekday(r.startDate))}</span>
         <span class="card-severity" style="background:#FCE7F3;color:#EC4899">经期</span>
       </div>
-      <div class="card-body">${[dur, cycle].filter(Boolean).join(' · ') || '经期开始'}</div>
+      <div class="card-body">${esc([dur, cycle].filter(Boolean).join(' · ') || '经期开始')}</div>
     </div>`;
   }
 }
@@ -573,49 +721,51 @@ function showDetail(id) {
     const relation = getPeriodRelation(rec.startDate);
     const timeRange = (rec.startTime || '') + (rec.endDate ? ` → ${rec.endDate !== rec.startDate ? fmtDate(rec.endDate) + ' ' : ''}${rec.endTime || ''}` : '');
     let medHtml = '';
-    if (rec.medication) {
-      const parts = [rec.medication.name, rec.medication.dosage, rec.medication.time ? `${rec.medication.time}服用` : ''].filter(Boolean);
-      if (rec.medication.effective) parts.push(LABELS.medEffect[rec.medication.effective] || rec.medication.effective);
-      medHtml = `<div class="detail-row"><span class="detail-label">止痛药</span><span class="detail-value">${parts.join('，')}</span></div>`;
+    const allMeds = rec.medications && rec.medications.length
+      ? rec.medications
+      : (rec.medication ? [rec.medication] : []);
+    if (allMeds.length) {
+      medHtml = allMeds.map((m, i) => {
+        const parts = [m.name, m.dosage, m.time ? `${m.time}服用` : ''].filter(Boolean);
+        if (m.effective) parts.push(LABELS.medEffect[m.effective] || m.effective);
+        const label = allMeds.length > 1 ? `止痛药${i + 1}` : '止痛药';
+        return `<div class="detail-row"><span class="detail-label">${esc(label)}</span><span class="detail-value">${esc(parts.join('，'))}</span></div>`;
+      }).join('');
     }
     body.innerHTML = `
-      <div class="detail-row"><span class="detail-label">开始</span><span class="detail-value">${fmtDate(rec.startDate)} ${fmtWeekday(rec.startDate)} ${rec.startTime || ''}</span></div>
-      ${rec.endDate ? `<div class="detail-row"><span class="detail-label">结束</span><span class="detail-value">${fmtDate(rec.endDate)} ${rec.endTime || ''}</span></div>` : ''}
-      ${rec.durationHours ? `<div class="detail-row"><span class="detail-label">持续</span><span class="detail-value">${rec.durationHours} 小时</span></div>` : ''}
-      <div class="detail-row"><span class="detail-label">部位</span><span class="detail-value">${labelsFor(LABELS.loc, rec.locations)}</span></div>
-      <div class="detail-row"><span class="detail-label">程度</span><span class="detail-value">${LABELS.sev[rec.severity] || ''}</span></div>
-      ${relation ? `<div class="detail-row"><span class="detail-label">经期关系</span><span class="detail-value">${relation}</span></div>` : ''}
-      ${rec.weatherTags?.length ? `<div class="detail-row"><span class="detail-label">天气</span><span class="detail-value">${labelsFor(LABELS.weather, rec.weatherTags)}</span></div>` : ''}
-      ${rec.sleepHours != null ? `<div class="detail-row"><span class="detail-label">睡眠</span><span class="detail-value">${rec.sleepHours} 小时</span></div>` : ''}
-      ${rec.diet24h ? `<div class="detail-row"><span class="detail-label">饮食</span><span class="detail-value">${rec.diet24h}</span></div>` : ''}
-      ${rec.triggers?.length ? `<div class="detail-row"><span class="detail-label">诱因</span><span class="detail-value">${labelsFor(LABELS.trigger, rec.triggers)}</span></div>` : ''}
-      ${rec.symptoms?.length ? `<div class="detail-row"><span class="detail-label">伴随症状</span><span class="detail-value">${labelsFor(LABELS.symptom, rec.symptoms)}</span></div>` : ''}
-      ${rec.prodromal?.length ? `<div class="detail-row"><span class="detail-label">前驱症状</span><span class="detail-value">${labelsFor(LABELS.prodromal, rec.prodromal)}</span></div>` : ''}
-      ${rec.relief?.length ? `<div class="detail-row"><span class="detail-label">缓解方法</span><span class="detail-value">${labelsFor(LABELS.relief, rec.relief)}</span></div>` : ''}
+      <div class="detail-row"><span class="detail-label">开始</span><span class="detail-value">${esc(fmtDate(rec.startDate))} ${esc(fmtWeekday(rec.startDate))} ${esc(rec.startTime || '')}</span></div>
+      ${rec.endDate ? `<div class="detail-row"><span class="detail-label">结束</span><span class="detail-value">${esc(fmtDate(rec.endDate))} ${esc(rec.endTime || '')}</span></div>` : ''}
+      ${rec.durationHours ? `<div class="detail-row"><span class="detail-label">持续</span><span class="detail-value">${esc(rec.durationHours)} 小时</span></div>` : ''}
+      <div class="detail-row"><span class="detail-label">部位</span><span class="detail-value">${esc(labelsFor(LABELS.loc, rec.locations))}</span></div>
+      <div class="detail-row"><span class="detail-label">程度</span><span class="detail-value">${esc(LABELS.sev[rec.severity] || '')}</span></div>
+      ${relation ? `<div class="detail-row"><span class="detail-label">经期关系</span><span class="detail-value">${esc(relation)}</span></div>` : ''}
+      ${rec.weatherTags?.length ? `<div class="detail-row"><span class="detail-label">天气</span><span class="detail-value">${esc(labelsFor(LABELS.weather, rec.weatherTags))}</span></div>` : ''}
+      ${rec.sleepHours != null ? `<div class="detail-row"><span class="detail-label">睡眠</span><span class="detail-value">${esc(rec.sleepHours)} 小时</span></div>` : ''}
+      ${rec.diet24h ? `<div class="detail-row"><span class="detail-label">饮食</span><span class="detail-value">${esc(rec.diet24h)}</span></div>` : ''}
+      ${rec.triggers?.length ? `<div class="detail-row"><span class="detail-label">诱因</span><span class="detail-value">${esc(labelsFor(LABELS.trigger, rec.triggers))}</span></div>` : ''}
+      ${rec.symptoms?.length ? `<div class="detail-row"><span class="detail-label">伴随症状</span><span class="detail-value">${esc(labelsFor(LABELS.symptom, rec.symptoms))}</span></div>` : ''}
+      ${rec.prodromal?.length ? `<div class="detail-row"><span class="detail-label">前驱症状</span><span class="detail-value">${esc(labelsFor(LABELS.prodromal, rec.prodromal))}</span></div>` : ''}
+      ${rec.relief?.length ? `<div class="detail-row"><span class="detail-label">缓解方法</span><span class="detail-value">${esc(labelsFor(LABELS.relief, rec.relief))}</span></div>` : ''}
       ${medHtml}
-      ${rec.postSymptoms ? `<div class="detail-row"><span class="detail-label">头痛后</span><span class="detail-value">${rec.postSymptoms}${rec.postSymptomsDuration ? `（持续${rec.postSymptomsDuration}h）` : ''}</span></div>` : ''}
-      ${rec.notes ? `<div class="detail-row"><span class="detail-label">备注</span><span class="detail-value">${rec.notes}</span></div>` : ''}
+      ${rec.postSymptoms ? `<div class="detail-row"><span class="detail-label">头痛后</span><span class="detail-value">${esc(rec.postSymptoms)}${rec.postSymptomsDuration ? `（持续${esc(rec.postSymptomsDuration)}h）` : ''}</span></div>` : ''}
+      ${rec.notes ? `<div class="detail-row"><span class="detail-label">备注</span><span class="detail-value">${esc(rec.notes)}</span></div>` : ''}
     `;
     editBtn.onclick = () => { closeModal('modal-detail'); showRecordMigraine(rec); };
   } else {
     title.textContent = '经期详情';
     body.innerHTML = `
-      <div class="detail-row"><span class="detail-label">开始日期</span><span class="detail-value">${fmtDate(rec.startDate)}</span></div>
-      ${rec.endDate ? `<div class="detail-row"><span class="detail-label">结束日期</span><span class="detail-value">${fmtDate(rec.endDate)}</span></div>` : ''}
-      ${rec.duration ? `<div class="detail-row"><span class="detail-label">持续天数</span><span class="detail-value">${rec.duration}天</span></div>` : ''}
-      ${rec.cycleLength ? `<div class="detail-row"><span class="detail-label">周期天数</span><span class="detail-value">${rec.cycleLength}天</span></div>` : ''}
-      ${rec.padUsage ? `<div class="detail-row"><span class="detail-label">卫生巾</span><span class="detail-value">每日: ${rec.padUsage}</span></div>` : ''}
-      ${rec.notes ? `<div class="detail-row"><span class="detail-label">备注</span><span class="detail-value">${rec.notes}</span></div>` : ''}
+      <div class="detail-row"><span class="detail-label">开始日期</span><span class="detail-value">${esc(fmtDate(rec.startDate))}</span></div>
+      ${rec.endDate ? `<div class="detail-row"><span class="detail-label">结束日期</span><span class="detail-value">${esc(fmtDate(rec.endDate))}</span></div>` : ''}
+      ${rec.duration ? `<div class="detail-row"><span class="detail-label">持续天数</span><span class="detail-value">${esc(rec.duration)}天</span></div>` : ''}
+      ${rec.cycleLength ? `<div class="detail-row"><span class="detail-label">周期天数</span><span class="detail-value">${esc(rec.cycleLength)}天</span></div>` : ''}
+      ${rec.padUsage ? `<div class="detail-row"><span class="detail-label">卫生巾</span><span class="detail-value">每日: ${esc(rec.padUsage)}</span></div>` : ''}
+      ${rec.notes ? `<div class="detail-row"><span class="detail-label">备注</span><span class="detail-value">${esc(rec.notes)}</span></div>` : ''}
     `;
     editBtn.onclick = () => { closeModal('modal-detail'); showRecordPeriod(rec); };
   }
   deleteBtn.onclick = () => {
-    if (confirm('确定删除这条记录吗？')) {
-      deleteRecord(rec.id);
-      closeModal('modal-detail');
-      showToast('已删除');
-      refreshCurrentView();
-    }
+    softDeleteRecord(rec);
+    closeModal('modal-detail');
   };
   openModal('modal-detail');
 }
@@ -662,6 +812,27 @@ function renderCalendar() {
 }
 function calendarPrev() { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } calSelected = null; renderCalendar(); }
 function calendarNext() { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } calSelected = null; renderCalendar(); }
+function showCalendarJump() {
+  const yr = getYearRange();
+  const selY = document.getElementById('cal-jump-year');
+  const selM = document.getElementById('cal-jump-month');
+  selY.innerHTML = '';
+  for (let y = yr.min; y <= yr.max; y++) {
+    selY.innerHTML += `<option value="${y}"${y === calYear ? ' selected' : ''}>${y}年</option>`;
+  }
+  selM.innerHTML = '';
+  for (let m = 1; m <= 12; m++) {
+    selM.innerHTML += `<option value="${m - 1}"${m - 1 === calMonth ? ' selected' : ''}>${m}月</option>`;
+  }
+  openModal('modal-cal-jump');
+}
+function doCalendarJump() {
+  calYear = parseInt(document.getElementById('cal-jump-year').value);
+  calMonth = parseInt(document.getElementById('cal-jump-month').value);
+  calSelected = null;
+  closeModal('modal-cal-jump');
+  renderCalendar();
+}
 function selectDay(ds) {
   calSelected = calSelected === ds ? null : ds;
   renderCalendar();
@@ -688,7 +859,22 @@ function renderDayDetail(ds) {
 
 // ===== HISTORY =====
 function renderHistory() {
+  applyHistoryFilters();
+}
+function filterHistory(filter, btn) {
+  historyFilter = filter;
+  document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyHistoryFilters();
+}
+function applyHistoryFilters() {
   const container = document.getElementById('history-list');
+  const countEl = document.getElementById('history-count');
+  const keyword = (document.getElementById('history-search')?.value || '').trim().toLowerCase();
+  const dateFrom = document.getElementById('search-date-from')?.value || '';
+  const dateTo = document.getElementById('search-date-to')?.value || '';
+  const sevFilter = document.getElementById('search-severity')?.value || '';
+
   let records;
   if (historyFilter === 'migraine') records = getMigraines().map(r => ({ ...r, sortDate: r.startDate }));
   else if (historyFilter === 'period') records = getPeriods().map(r => ({ ...r, sortDate: r.startDate }));
@@ -696,8 +882,39 @@ function renderHistory() {
     ...getMigraines().map(r => ({ ...r, sortDate: r.startDate })),
     ...getPeriods().map(r => ({ ...r, sortDate: r.startDate })),
   ];
+
+  if (dateFrom) records = records.filter(r => r.sortDate >= dateFrom);
+  if (dateTo) records = records.filter(r => r.sortDate <= dateTo);
+  if (sevFilter) records = records.filter(r => r.type === 'migraine' && String(r.severity) === sevFilter);
+
+  if (keyword) {
+    records = records.filter(r => {
+      const fields = [
+        r.notes, r.diet24h, r.postSymptoms,
+        ...(r.locations || []).map(l => LABELS.loc[l] || l),
+        ...(r.triggers || []).map(t => LABELS.trigger[t] || t),
+        ...(r.symptoms || []).map(s => LABELS.symptom[s] || s),
+        ...(r.relief || []).map(s => LABELS.relief[s] || s),
+        ...(r.prodromal || []).map(s => LABELS.prodromal[s] || s),
+        ...(r.weatherTags || []).map(w => LABELS.weather[w] || w),
+        r.startDate, LABELS.sev[r.severity] || '',
+      ];
+      const allMeds = r.medications?.length ? r.medications : (r.medication ? [r.medication] : []);
+      allMeds.forEach(m => { if (m.name) fields.push(m.name); });
+      return fields.some(f => f && String(f).toLowerCase().includes(keyword));
+    });
+  }
+
   records.sort((a, b) => b.sortDate.localeCompare(a.sortDate));
-  if (!records.length) { container.innerHTML = '<div class="empty-state">暂无记录</div>'; return; }
+  const totalAll = getData().length;
+  if (countEl) {
+    if (keyword || dateFrom || dateTo || sevFilter || historyFilter !== 'all') {
+      countEl.textContent = `找到 ${records.length} 条记录（共 ${totalAll} 条）`;
+    } else {
+      countEl.textContent = '';
+    }
+  }
+  if (!records.length) { container.innerHTML = '<div class="empty-state">暂无匹配记录</div>'; return; }
   let html = '';
   let lastMonth = '';
   records.forEach(r => {
@@ -711,11 +928,25 @@ function renderHistory() {
   });
   container.innerHTML = html;
 }
-function filterHistory(filter, btn) {
-  historyFilter = filter;
-  document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  renderHistory();
+
+function getYearRange() {
+  const years = getData().map(r => parseInt((r.startDate || '').slice(0, 4))).filter(y => y > 2000);
+  const cur = new Date().getFullYear();
+  const min = years.length ? Math.min(...years) : cur;
+  const max = Math.max(cur + 1, ...(years.length ? [Math.max(...years) + 1] : []));
+  return { min, max };
+}
+function yearOptions(selected, range) {
+  let html = '';
+  for (let y = range.min; y <= range.max; y++) {
+    html += `<option value="${y}"${String(y) === selected ? ' selected' : ''}>${y}年</option>`;
+  }
+  return html;
+}
+
+function toggleStatSection(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('collapsed');
 }
 
 // ===== STATISTICS =====
@@ -770,14 +1001,12 @@ function renderStats() {
       if (c > maxCount) maxCount = c;
     }
 
-    html += `<div class="stat-section">`;
-    html += `<div class="trend-year-row"><h3 style="margin:0">偏头痛年度统计</h3><div class="trend-year-right"><select class="year-select" onchange="selectStatsYear(this)">`;
-    for (let y = 2024; y <= 2100; y++) {
-      html += `<option value="${y}"${String(y) === statsYear ? ' selected' : ''}>${y}年</option>`;
-    }
-    html += `</select><span class="trend-year-total">共 <strong>${yearTotal}</strong> 次</span></div></div>`;
+    html += `<div class="stat-section" id="sec-migraine-yearly">`;
+    const yr = getYearRange();
+    html += `<div class="stat-section-header" onclick="toggleStatSection('sec-migraine-yearly')"><div class="trend-year-row" style="flex:1;margin-bottom:0"><h3 style="margin:0">偏头痛年度统计</h3><div class="trend-year-right"><select class="year-select" onclick="event.stopPropagation()" onchange="selectStatsYear(this)">${yearOptions(statsYear, yr)}</select><span class="trend-year-total">共 <strong>${yearTotal}</strong> 次</span></div></div><svg class="collapse-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>`;
+    html += `<div class="stat-section-body">`;
 
-    html += `<div class="stat-sub-title">月度发作趋势</div>`;
+    html += `<div class="stat-sub-title" style="margin-top:14px">月度发作趋势</div>`;
     html += `<div class="trend-chart-area"><div class="trend-chart">`;
     for (let mo = 0; mo < 12; mo++) {
       const c = yearMonthCounts[mo];
@@ -826,7 +1055,7 @@ function renderStats() {
       const opacity = 1 - ratio * 0.65;
       html += `<div class="bar-row"><span class="bar-label">${LABELS.trigger[k] || k}</span><div class="bar-track"><div class="bar-fill" style="width:${v / maxTrig * 100}%;background:rgba(124,58,237,${opacity})"></div></div><span class="bar-count">${v}<small class="bar-pct">${sevTotal > 0 ? ' (' + pct + '%)' : ''}</small></span></div>`;
     });
-    html += `</div></div>`;
+    html += `</div></div></div>`;
   }
 
   // ===== 年度变化对比 =====
@@ -837,7 +1066,9 @@ function renderStats() {
       const selYears = statsCompareYears.filter(y => allDataYears.includes(y)).sort();
       const yearColors = ['#7C3AED', '#A78BFA', '#C4B5FD', '#DDD6FE', '#EDE9FE'];
 
-      html += `<div class="stat-section"><h3>年度变化对比</h3>`;
+      html += `<div class="stat-section" id="sec-compare">`;
+      html += `<div class="stat-section-header" onclick="toggleStatSection('sec-compare')"><h3 style="margin:0">年度变化对比</h3><svg class="collapse-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>`;
+      html += `<div class="stat-section-body">`;
       html += `<div class="compare-year-picker"><span class="compare-year-hint">选择对比年份（至少2个）：</span><div class="compare-year-chips">`;
       allDataYears.forEach(y => {
         const active = selYears.includes(y) ? ' active' : '';
@@ -921,7 +1152,7 @@ function renderStats() {
         }
       }
 
-      html += `</div>`;
+      html += `</div></div>`;
     }
   }
 
@@ -931,12 +1162,9 @@ function renderStats() {
     if (!statsRelYear) statsRelYear = String(relCurYear);
     const relMigraines = migraines.filter(m => m.startDate.startsWith(statsRelYear));
 
-    html += `<div class="stat-section">`;
-    html += `<div class="trend-year-row"><h3 style="margin:0">关联分析</h3><div class="trend-year-right"><select class="year-select" onchange="selectStatsRelYear(this)">`;
-    for (let y = 2024; y <= 2100; y++) {
-      html += `<option value="${y}"${String(y) === statsRelYear ? ' selected' : ''}>${y}年</option>`;
-    }
-    html += `</select></div></div>`;
+    html += `<div class="stat-section" id="sec-relation">`;
+    html += `<div class="stat-section-header" onclick="toggleStatSection('sec-relation')"><div class="trend-year-row" style="flex:1;margin-bottom:0"><h3 style="margin:0">关联分析</h3><div class="trend-year-right"><select class="year-select" onclick="event.stopPropagation()" onchange="selectStatsRelYear(this)">${yearOptions(statsRelYear, getYearRange())}</select></div></div><svg class="collapse-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>`;
+    html += `<div class="stat-section-body">`;
 
     // 1) 星期几分布
     const weekNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
@@ -1040,7 +1268,7 @@ function renderStats() {
       html += `</div>`;
     }
 
-    html += `</div>`;
+    html += `</div></div>`;
   }
 
   const sortedPeriods = [...periods].sort((a, b) => a.startDate.localeCompare(b.startDate));
@@ -1053,12 +1281,9 @@ function renderStats() {
     const avgCycle = yearCycles.length ? (yearCycles.reduce((a, b) => a + b, 0) / yearCycles.length).toFixed(1) : '-';
     const rangeText = yearCycles.length ? `${Math.min(...yearCycles)}-${Math.max(...yearCycles)}` : '-';
 
-    html += `<div class="stat-section">`;
-    html += `<div class="trend-year-row"><h3 style="margin:0">经期周期年度统计</h3><div class="trend-year-right"><select class="year-select" onchange="selectStatsPeriodYear(this)">`;
-    for (let y = 2024; y <= 2100; y++) {
-      html += `<option value="${y}"${String(y) === statsPeriodYear ? ' selected' : ''}>${y}年</option>`;
-    }
-    html += `</select></div></div>`;
+    html += `<div class="stat-section" id="sec-period-yearly">`;
+    html += `<div class="stat-section-header" onclick="toggleStatSection('sec-period-yearly')"><div class="trend-year-row" style="flex:1;margin-bottom:0"><h3 style="margin:0">经期周期年度统计</h3><div class="trend-year-right"><select class="year-select" onclick="event.stopPropagation()" onchange="selectStatsPeriodYear(this)">${yearOptions(statsPeriodYear, getYearRange())}</select></div></div><svg class="collapse-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>`;
+    html += `<div class="stat-section-body">`;
     html += `<div style="display:flex;gap:12px;margin-bottom:14px;margin-top:14px">
         <div class="stat-card" style="flex:1"><div class="stat-value pink">${avgCycle}</div><div class="stat-label">平均周期(天)</div></div>
         <div class="stat-card" style="flex:1"><div class="stat-value pink">${rangeText}</div><div class="stat-label">周期范围(天)</div></div>
@@ -1072,7 +1297,7 @@ function renderStats() {
     } else {
       html += `<div class="empty-state" style="padding:16px">该年度暂无经期周期数据</div>`;
     }
-    html += `</div>`;
+    html += `</div></div>`;
   }
 
   document.getElementById('stats-content').innerHTML = html;
@@ -1080,12 +1305,23 @@ function renderStats() {
 
 // ===== SETTINGS =====
 function exportData() {
-  const data = getData();
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const exportObj = {
+    version: 2,
+    exportDate: new Date().toISOString(),
+    user: currentUser,
+    records: getData(),
+    customOptions: JSON.parse(localStorage.getItem(CUSTOM_OPTIONS_KEY) || '{}'),
+    removedDefaults: JSON.parse(localStorage.getItem(REMOVED_DEFAULTS_KEY) || '{}')
+  };
+  const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = `health_data_${todayStr()}.json`; a.click();
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `health_data_${currentUser}_${todayStr()}.json`;
+  a.click();
   URL.revokeObjectURL(url);
-  showToast('数据已导出');
+  localStorage.setItem('migraine_last_export', Date.now().toString());
+  showToast('数据已导出（含全部记录和自定义选项）');
 }
 function importData(e) {
   const file = e.target.files[0];
@@ -1093,14 +1329,48 @@ function importData(e) {
   const reader = new FileReader();
   reader.onload = () => {
     try {
-      const imported = JSON.parse(reader.result);
-      if (!Array.isArray(imported)) throw new Error();
+      const raw = JSON.parse(reader.result);
+      let records, customOptions, removedDefaults;
+
+      if (Array.isArray(raw)) {
+        records = raw;
+      } else if (raw.version && raw.records) {
+        records = raw.records || [];
+        customOptions = raw.customOptions;
+        removedDefaults = raw.removedDefaults;
+      } else {
+        throw new Error('unrecognized format');
+      }
+
       const existing = getData();
       const existingIds = new Set(existing.map(r => r.id));
       let added = 0;
-      imported.forEach(r => { if (!existingIds.has(r.id)) { existing.push(r); added++; } });
+      records.forEach(r => { if (r.id && !existingIds.has(r.id)) { existing.push(r); added++; } });
       saveData(existing);
-      showToast(`已导入 ${added} 条新记录`);
+
+      if (customOptions && typeof customOptions === 'object') {
+        const cur = JSON.parse(localStorage.getItem(CUSTOM_OPTIONS_KEY) || '{}');
+        for (const [group, items] of Object.entries(customOptions)) {
+          if (!Array.isArray(items)) continue;
+          if (!cur[group]) cur[group] = [];
+          items.forEach(v => { if (!cur[group].includes(v)) cur[group].push(v); });
+        }
+        localStorage.setItem(CUSTOM_OPTIONS_KEY, JSON.stringify(cur));
+      }
+
+      if (removedDefaults && typeof removedDefaults === 'object') {
+        const cur = JSON.parse(localStorage.getItem(REMOVED_DEFAULTS_KEY) || '{}');
+        for (const [group, items] of Object.entries(removedDefaults)) {
+          if (!Array.isArray(items)) continue;
+          if (!cur[group]) cur[group] = [];
+          items.forEach(v => { if (!cur[group].includes(v)) cur[group].push(v); });
+        }
+        localStorage.setItem(REMOVED_DEFAULTS_KEY, JSON.stringify(cur));
+      }
+
+      const parts = [`已导入 ${added} 条新记录`];
+      if (customOptions) parts.push('自定义选项已合并');
+      showToast(parts.join('，'));
       refreshCurrentView();
     } catch { showToast('导入失败，请检查文件格式'); }
   };
@@ -1118,143 +1388,35 @@ function confirmClearData() {
   }
 }
 
-// ===== HISTORICAL DATA =====
-function loadHistoricalData() {
-  if (getData().length > 0) return;
-  const records = [];
-  // [startDate, locations[], severity, triggers[], relief[], symptoms[], prodromal[], notes]
-  const hm = [
-    ['2024-01-10',['left','top','right'],4,['period'],['sneeze'],['vomiting'],['chills','drowsy'],'生理期前期；乳房胀痛'],
-    ['2024-01-26',[],1,[],[],[],'','肠胃炎'],
-    ['2024-01-30',['left'],1,['weather'],['comb','sneeze','huoxiang'],[],[],'下雨天'],
-    ['2024-02-02',['left'],3,['weather'],['sneeze','huoxiang'],[],[],'微雨天'],
-    ['2024-02-16',['top','right'],3,['period','fatigue'],['sleep','huoxiang'],[],[],''],
-    ['2024-02-21',[],1,['cold'],['comb','huoxiang'],[],['chills'],'感冒+冰箱除冰劳累受寒'],
-    ['2024-03-01',['right'],3,[],['sneeze','huoxiang'],[],['head_foggy'],'前兆后发作'],
-    ['2024-03-11',['left','top'],1,['fatigue','cold','period'],['sneeze','huoxiang','sleep'],[],[],'地铁空调低'],
-    ['2024-03-27',[],5,['fatigue'],[],['vomiting'],[],'过度劳累；呕吐2-3次'],
-    ['2024-04-01',[],1,['cold'],['sleep'],[],[],'前一天吹到风，中午自行缓解'],
-    ['2024-04-07',['right'],3,['sleep','weather'],[],[],[],'极度乏困+下雨阴天+熬夜打电话'],
-    ['2024-04-10',['right'],1,['period'],['sleep','comb','footbath','sneeze'],[],[],''],
-    ['2024-04-18',['right'],1,['weather'],['footbath','comb','sneeze'],[],[],'阴天'],
-    ['2024-05-02',[],4,['weather','fatigue'],['footbath','comb','sneeze','huoxiang'],['vomiting'],['drowsy','sneeze'],'下雨天/前一天去SZ劳累'],
-    ['2024-05-16',['left'],2,['period','sleep'],[],[],[],'生理期第一天+中午没午休'],
-    ['2024-05-21',['right'],1,['sleep','fatigue','weather'],['footbath','comb'],[],[],'5:30起床做PPT+下雨'],
-    ['2024-05-25',['right','top','left'],1,[],['sleep'],[],[],''],
-    ['2024-05-31',['right'],3,[],['footbath','massage','sneeze','hot_wash'],[],['drowsy'],''],
-    ['2024-06-20',[],3,['fatigue','period'],['sleep'],[],[],'过度劳累+生理期将至'],
-    ['2024-06-28',[],1,[],['sleep','music'],[],[],''],
-    ['2024-07-12',['right'],3,[],['comb','sneeze','sun','sleep'],['vomiting'],[],'身体极虚'],
-    ['2024-07-21',['left'],3,['sleep','fatigue'],['sleep'],[],['head_foggy'],'睡眠不规律+出去玩过度劳累'],
-    ['2024-07-30',[],4,[],['sleep'],['vomiting'],[],'蹲大号后好转'],
-    ['2024-08-02',['top'],1,[],[],[],[],'鼻敏感'],
-    ['2024-08-12',['left'],1,[],['sleep'],[],[],''],
-    ['2024-08-30',['right'],5,['period','sleep'],['huoxiang','footbath','comb','hot_wash','sleep'],['vomiting'],['drowsy'],'呕吐全吐；胃满'],
-    ['2024-09-01',['right'],1,['emotion'],[],['appetite_loss'],[],'给妈妈打电话时哭泣'],
-    ['2024-09-12',['top','right'],4,['period','smell'],['massage','sleep'],[],['drowsy','chills'],'生理期第二天+闻到香水味'],
-    ['2024-09-18',['right'],3,['emotion'],['massage','hot_wash','huoxiang'],[],[],'聊天时情绪起伏太大'],
-    ['2024-10-06',[],3,['sleep'],['sleep','massage'],[],[],'看悬疑动作电影致凌晨2点'],
-    ['2024-10-10',['right','top'],2,['emotion','talking'],['huoxiang','hot_wash','sleep'],['nasal','diarrhea'],[],'毕业论文情绪崩溃大哭'],
-    ['2024-10-12',['left','top'],2,['emotion'],['massage','huoxiang','sneeze'],[],[],'焦虑紧张'],
-    ['2024-10-26',['right'],3,['period','fatigue'],['massage','huoxiang','sneeze','sleep'],[],[],'当天往返深圳做实验'],
-    ['2024-10-30',['left'],3,[],['massage','hot_wash'],[],[],''],
-    ['2024-11-25',['top'],1,['sleep','period'],['huoxiang'],[],[],'早起+晚睡+生理期'],
-    ['2024-11-30',['right'],1,['fatigue','screen','cold'],['sleep'],[],[],'中午没休息+看微信读书+感冒'],
-    ['2024-12-12',['left'],2,['sleep','screen'],['massage','footbath'],[],['head_swell'],'早起+看小视频过于专注'],
-    ['2025-01-08',['top','right'],3,['screen'],['huoxiang','sleep'],[],['head_foggy'],'做组会PPT精力集中'],
-    ['2025-03-01',['top','right'],3,['period','fatigue','talking'],['huoxiang','sleep','hot_wash'],[],[],''],
-    ['2025-04-02',['right'],3,['period','talking'],['huoxiang','sleep','massage'],['nausea'],[],'吃饭聊天说话很多'],
-    ['2025-04-05',['left','top'],2,[],['massage','sleep'],[],[],''],
-    ['2025-04-22',['top'],3,['fatigue','screen'],['huoxiang','massage'],[],[],'看手机视频一下午'],
-    ['2025-04-28',['left'],3,['screen'],['huoxiang'],[],[],'看电脑过于集中精力'],
-    ['2025-05-22',['right','top'],3,[],['taichong','massage'],[],[],''],
-    ['2025-05-24',['left','top'],3,['sleep','screen'],['massage','taichong','sleep'],[],[],'中午没休息+网购一直看手机'],
-    ['2025-06-04',['top'],1,['period','sleep'],['taichong'],[],[],'生理期+组会早起做PPT'],
-    ['2025-06-19',['top','right'],3,['sleep'],['sleep','massage','sneeze','huoxiang','hot_wash'],[],['runny_nose','chills'],'前一晚做梦没休息好'],
-    ['2025-07-16',['right'],3,['sleep','screen'],['sneeze','hot_wash','huoxiang','sleep'],[],[],'前两天早起+电脑跑数据'],
-    ['2025-07-18',['left'],3,['talking','screen'],['huoxiang','music','sleep'],[],[],'吃饭与人交谈说话太多'],
-    ['2025-07-26',[],4,['weather'],['huoxiang','sleep'],['dizziness','vomiting'],[],'前一天淋雨'],
-    ['2025-08-09',['top','right'],4,[],['footbath','comb','massage','sun'],['vomiting'],[],''],
-    ['2025-08-29',['top','left'],3,['sleep','screen'],['huoxiang','sleep'],[],['sneeze','chills'],'多梦休息不足+看一天电脑'],
-    ['2025-08-30',['right'],1,[],['massage','taichong'],[],[],'爬山+刮经络'],
-    ['2025-09-11',['right'],3,[],['sun','sleep','music'],['vomiting'],['chills'],''],
-    ['2025-09-18',['top'],1,['fatigue','screen'],['sleep','sun'],[],[],'非常疲惫+一直看手机'],
-    ['2025-10-01',['top'],3,['screen'],['sleep'],[],['head_foggy'],'一边做实验一边听费脑播客'],
-    ['2025-10-05',['top'],1,['screen'],['comb','taichong','sleep'],[],[],'周日一直看视频'],
-    ['2025-10-29',['right','top'],3,['period','screen'],['sleep'],['vomiting'],['head_foggy'],'双11一直看手机购物'],
-    ['2025-11-02',['left','top'],2,['fatigue'],[],[],[],'收拾新住处过于劳累'],
-    ['2025-12-27',['right','top'],3,['period'],['taichong','sleep'],['vomiting'],['head_foggy'],'前一天喝水少/生理期将至'],
-    ['2025-12-30',['right','top'],3,['period'],['comb','footbath','taichong','hot_wash'],[],[],'生理期第二天'],
-    ['2026-01-20',['right','top'],2,['screen'],['hot_wash'],[],[],'处理MST数据过于专注且时间长'],
-    ['2026-02-01',['right'],3,['period','fatigue'],['sleep','taichong','hot_wash'],['vomiting'],[],'生理期临近/前一天劳累'],
-    ['2026-02-27',['right'],2,['emotion'],['hot_wash','footbath'],[],[],'答辩彩排紧张'],
-    ['2026-03-13',['left'],3,[],['footbath','music','sleep','hot_wash'],['heavy_head'],[],''],
-    ['2026-03-27',['top','right'],2,['fatigue','screen'],['sleep','taichong'],['nausea','heavy_head'],['drowsy','head_foggy'],'前两天做了两整天实验+MST数据分析过于专注'],
-  ];
-  hm.forEach((m, i) => {
-    records.push({
-      id: `hm${i}`, type: 'migraine',
-      startDate: m[0], startTime: '18:00', endDate: '', endTime: '',
-      durationHours: null,
-      locations: m[1], severity: m[2],
-      triggers: m[3], relief: m[4],
-      symptoms: m[5], prodromal: m[6],
-      weatherTags: [], sleepHours: null, diet24h: '',
-      postSymptoms: '', postSymptomsDuration: null,
-      medication: null,
-      notes: m[7],
-    });
-  });
-
-  const hp = [
-    ['2024-01-16','',0,29,'',''],
-    ['2024-02-14','',0,31,'',''],
-    ['2024-03-16','',0,28,'',''],
-    ['2024-04-13','',0,33,'',''],
-    ['2024-05-16','',0,37,'',''],
-    ['2024-06-22','',0,39,'',''],
-    ['2024-07-31','',0,42,'',''],
-    ['2024-09-11','',0,43,'',''],
-    ['2024-10-24','',0,32,'',''],
-    ['2024-11-25','',0,30,'',''],
-    ['2024-12-25','',0,31,'',''],
-    ['2025-01-25','',0,34,'',''],
-    ['2025-02-28','',0,32,'',''],
-    ['2025-04-01','',0,33,'',''],
-    ['2025-05-04','',0,30,'',''],
-    ['2025-06-03','2025-06-06',4,39,'2,3.5,0.5,0.5',''],
-    ['2025-07-12','2025-07-16',5,39,'1,3.5,2,1,0.5',''],
-    ['2025-08-20','2025-08-24',5,34,'2,1,1,0.5,0.5',''],
-    ['2025-09-23','2025-09-29',7,34,'1,3,1.5,0.5,0.2,0.2,0.2',''],
-    ['2025-10-27','',0,27,'1,3,3,0.5,0.5',''],
-    ['2025-11-23','2025-11-27',5,36,'2,4,1,0.5,0.5',''],
-    ['2025-12-29','',0,38,'1,3,0.5,0.5',''],
-    ['2026-02-05','',0,35,'1,2',''],
-    ['2026-03-12','2026-03-15',4,0,'1,1,1,1',''],
-  ];
-  hp.forEach((p, i) => {
-    records.push({
-      id: `hp${i}`, type: 'period',
-      startDate: p[0], endDate: p[1],
-      duration: p[2] || null, cycleLength: p[3] || null,
-      padUsage: p[4], notes: p[5],
-    });
-  });
-
-  saveData(records);
-}
+// Historical data removed for privacy — use "导入数据" to restore from backup JSON
+function loadHistoricalData() {}
 
 // ===== INIT =====
 function showUserPicker() {
   const users = getAllUsers();
-  const modal = document.getElementById('modal-user');
   const list = document.getElementById('user-list');
   let html = '';
   users.forEach(u => {
-    html += `<button class="user-pick-btn" onclick="switchUser('${u.replace(/'/g, "\\'")}');closeModal('modal-user')">${u}</button>`;
+    const escaped = esc(u);
+    const jsName = u.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    html += `<div class="user-pick-row">
+      <button class="user-pick-btn" onclick="switchUser('${jsName}');closeModal('modal-user')">${escaped}</button>
+      ${u !== currentUser ? `<button class="user-delete-btn" onclick="deleteUser('${jsName}')" title="删除用户">&times;</button>` : ''}
+    </div>`;
   });
   list.innerHTML = html;
   openModal('modal-user');
+}
+function deleteUser(name) {
+  if (!confirm(`确定删除用户「${name}」及其所有数据吗？此操作不可恢复！`)) return;
+  const prefix = name + '_';
+  localStorage.removeItem(prefix + 'migraine_tracker_data');
+  localStorage.removeItem(prefix + 'migraine_tracker_custom_options');
+  localStorage.removeItem(prefix + 'migraine_tracker_removed_defaults');
+  const users = getAllUsers().filter(u => u !== name);
+  saveUserList(users);
+  showUserPicker();
+  showToast(`已删除用户「${name}」`);
 }
 function addNewUser() {
   const input = document.getElementById('new-user-input');
@@ -1266,16 +1428,31 @@ function addNewUser() {
   showToast(`已切换到「${name}」`);
 }
 function init() {
+  loadTheme();
   const urlUser = new URLSearchParams(window.location.search).get('user');
+  const users = getAllUsers();
+
   if (urlUser) {
     currentUser = urlUser;
+  } else if (users.length === 1) {
+    currentUser = users[0];
+  } else if (users.length > 1) {
+    currentUser = users[0];
+    initUserKeys();
+    registerUser(currentUser);
+    document.getElementById('current-user-name').textContent = currentUser;
+    setupEventListeners();
+    renderDashboard();
+    showUserPicker();
+    return;
   } else {
-    const users = getAllUsers();
-    currentUser = users.length ? users[0] : 'default';
+    currentUser = 'default';
   }
+
   initUserKeys();
   registerUser(currentUser);
-  // Migrate legacy data (no prefix) to the first user
+
+  // Migrate legacy unprefixed data
   const legacyData = localStorage.getItem('migraine_tracker_data');
   if (legacyData && !localStorage.getItem(STORAGE_KEY) && STORAGE_KEY !== 'migraine_tracker_data') {
     localStorage.setItem(STORAGE_KEY, legacyData);
@@ -1284,12 +1461,35 @@ function init() {
     const legacyRD = localStorage.getItem('migraine_tracker_removed_defaults');
     if (legacyRD) localStorage.setItem(REMOVED_DEFAULTS_KEY, legacyRD);
   }
+
+  // First-time user: prompt for name
+  if (currentUser === 'default' && !getData().length && !urlUser) {
+    const name = prompt('欢迎使用健康日记！请输入你的名字：');
+    if (name && name.trim()) {
+      currentUser = name.trim();
+      initUserKeys();
+      registerUser(currentUser);
+      const url = new URL(window.location);
+      url.searchParams.set('user', currentUser);
+      window.history.replaceState({}, '', url);
+    }
+  }
+
   document.getElementById('current-user-name').textContent = currentUser;
   loadHistoricalData();
   migrateData();
   const now = new Date();
   calYear = now.getFullYear();
   calMonth = now.getMonth();
+
+  setupEventListeners();
+  renderDashboard();
+  checkBackupReminder();
+}
+
+function setupEventListeners() {
+  if (setupEventListeners._done) return;
+  setupEventListeners._done = true;
 
   document.querySelectorAll('.chip-group:not(.single-select)').forEach(group => {
     group.addEventListener('click', e => {
@@ -1349,8 +1549,12 @@ function init() {
 
       if (group.id === 'm-med-taken') {
         const details = document.getElementById('m-med-details');
-        if (chip.dataset.value === 'yes') details.classList.remove('hidden');
-        else details.classList.add('hidden');
+        if (chip.dataset.value === 'yes') {
+          details.classList.remove('hidden');
+          if (!document.querySelectorAll('#m-med-list .med-entry').length) addMedEntry();
+        } else {
+          details.classList.add('hidden');
+        }
       }
     });
   });
@@ -1382,8 +1586,17 @@ function init() {
   }
   pStart.addEventListener('change', autoCalcPeriodDuration);
   pEnd.addEventListener('change', autoCalcPeriodDuration);
+}
 
-  renderDashboard();
+function checkBackupReminder() {
+  if (!getData().length) return;
+  const last = parseInt(localStorage.getItem('migraine_last_export') || '0');
+  const daysSince = (Date.now() - last) / 86400000;
+  if (daysSince > 30) {
+    setTimeout(() => {
+      showToast('已超过30天未备份，建议在设置中导出数据');
+    }, 2000);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);

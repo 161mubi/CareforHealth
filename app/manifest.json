@@ -1,0 +1,16 @@
+{
+  "name": "健康日记 - 偏头痛与经期记录",
+  "short_name": "健康日记",
+  "description": "记录偏头痛发作与生理期，查看统计与关联分析",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F9FAFB",
+  "theme_color": "#7C3AED",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
