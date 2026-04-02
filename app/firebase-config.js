@@ -4,12 +4,12 @@
 // 请将下面的空值替换为你的 Firebase 项目配置
 // 获取方式: Firebase Console → 项目设置 → 你的应用 → Web 应用 → 配置
 const FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyCSpxTWeGdVE7XXDrdlilc08CBWM9lzSek",
+  authDomain: "careforhealth-795fd.firebaseapp.com",
+  projectId: "careforhealth-795fd",
+  storageBucket: "careforhealth-795fd.firebasestorage.app",
+  messagingSenderId: "51645264327",
+  appId: "1:51645264327:web:2c3009d99d855116a969e2"
 };
 
 let _fbAuth = null;
