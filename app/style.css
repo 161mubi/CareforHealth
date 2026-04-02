@@ -959,6 +959,50 @@ html, body {
 }
 .cloud-auth-footer a:hover { text-decoration: underline; }
 
+/* ===== Welcome Modal ===== */
+.welcome-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 10px 0;
+}
+.welcome-actions .btn-primary {
+  font-size: 16px;
+  padding: 15px;
+}
+.btn-secondary {
+  padding: 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+}
+.btn-secondary:active { background: var(--bg); }
+.welcome-cloud-hint, .welcome-local-hint {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text3);
+  margin: 8px 0 0;
+}
+.welcome-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--text3);
+  font-size: 13px;
+}
+.welcome-divider::before, .welcome-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
 /* ===== Toast ===== */
 .toast {
   position: fixed;

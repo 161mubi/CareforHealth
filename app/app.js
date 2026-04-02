@@ -42,7 +42,7 @@ function switchUser(name) {
   const url = new URL(window.location);
   url.searchParams.set('user', name);
   window.history.replaceState({}, '', url);
-  document.getElementById('current-user-name').textContent = name;
+  updateAppTitle();
   loadHistoricalData();
   migrateData();
   renderDashboard();
@@ -1399,61 +1399,47 @@ function confirmClearData() {
 function loadHistoricalData() {}
 
 // ===== INIT =====
-function showUserPicker() {
-  const users = getAllUsers();
-  const list = document.getElementById('user-list');
-  let html = '';
-  users.forEach(u => {
-    const escaped = esc(u);
-    const jsName = u.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    html += `<div class="user-pick-row">
-      <button class="user-pick-btn" onclick="switchUser('${jsName}');closeModal('modal-user')">${escaped}</button>
-      ${u !== currentUser ? `<button class="user-delete-btn" onclick="deleteUser('${jsName}')" title="删除用户">&times;</button>` : ''}
-    </div>`;
-  });
-  list.innerHTML = html;
-  openModal('modal-user');
+function updateAppTitle() {
+  const title = document.getElementById('app-title');
+  if (!title) return;
+  if (typeof _fbUser !== 'undefined' && _fbUser) {
+    const name = _fbUser.email.split('@')[0];
+    title.textContent = name + ' 的健康日记';
+  } else if (currentUser && currentUser !== 'default' && currentUser !== 'local') {
+    title.textContent = currentUser + ' 的健康日记';
+  } else {
+    title.textContent = '健康日记';
+  }
 }
-function deleteUser(name) {
-  if (!confirm(`确定删除用户「${name}」及其所有数据吗？此操作不可恢复！`)) return;
-  const prefix = name + '_';
-  localStorage.removeItem(prefix + 'migraine_tracker_data');
-  localStorage.removeItem(prefix + 'migraine_tracker_custom_options');
-  localStorage.removeItem(prefix + 'migraine_tracker_removed_defaults');
-  const users = getAllUsers().filter(u => u !== name);
-  saveUserList(users);
-  showUserPicker();
-  showToast(`已删除用户「${name}」`);
+
+function startLocalMode() {
+  closeModal('modal-welcome');
+  const name = prompt('请输入你的名字（用于标题显示）：');
+  if (name && name.trim()) {
+    currentUser = name.trim();
+  } else {
+    currentUser = 'local';
+  }
+  initUserKeys();
+  registerUser(currentUser);
+  localStorage.setItem('migraine_local_user', currentUser);
+  updateAppTitle();
+  renderDashboard();
 }
-function addNewUser() {
-  const input = document.getElementById('new-user-input');
-  const name = input.value.trim();
-  if (!name) return;
-  input.value = '';
-  switchUser(name);
-  closeModal('modal-user');
-  showToast(`已切换到「${name}」`);
-}
+
 function init() {
   loadTheme();
+
+  // Determine user identity
   const urlUser = new URLSearchParams(window.location.search).get('user');
-  const users = getAllUsers();
+  const savedLocal = localStorage.getItem('migraine_local_user');
 
   if (urlUser) {
     currentUser = urlUser;
-  } else if (users.length === 1) {
-    currentUser = users[0];
-  } else if (users.length > 1) {
-    currentUser = users[0];
-    initUserKeys();
-    registerUser(currentUser);
-    document.getElementById('current-user-name').textContent = currentUser;
-    setupEventListeners();
-    renderDashboard();
-    showUserPicker();
-    return;
+  } else if (savedLocal) {
+    currentUser = savedLocal;
   } else {
-    currentUser = 'default';
+    currentUser = 'local';
   }
 
   initUserKeys();
@@ -1469,20 +1455,27 @@ function init() {
     if (legacyRD) localStorage.setItem(REMOVED_DEFAULTS_KEY, legacyRD);
   }
 
-  // First-time user: prompt for name
-  if (currentUser === 'default' && !getData().length && !urlUser) {
-    const name = prompt('欢迎使用健康日记！请输入你的名字：');
-    if (name && name.trim()) {
-      currentUser = name.trim();
-      initUserKeys();
-      registerUser(currentUser);
-      const url = new URL(window.location);
-      url.searchParams.set('user', currentUser);
-      window.history.replaceState({}, '', url);
+  // Migrate old named-user data to current user
+  const users = getAllUsers();
+  if (currentUser === 'local' && !getData().length) {
+    for (const u of users) {
+      if (u === 'local' || u === 'default') continue;
+      const uData = localStorage.getItem(u + '_migraine_tracker_data');
+      if (uData) {
+        localStorage.setItem(STORAGE_KEY, uData);
+        const uCO = localStorage.getItem(u + '_migraine_tracker_custom_options');
+        if (uCO) localStorage.setItem(CUSTOM_OPTIONS_KEY, uCO);
+        const uRD = localStorage.getItem(u + '_migraine_tracker_removed_defaults');
+        if (uRD) localStorage.setItem(REMOVED_DEFAULTS_KEY, uRD);
+        currentUser = u;
+        initUserKeys();
+        localStorage.setItem('migraine_local_user', currentUser);
+        break;
+      }
     }
   }
 
-  document.getElementById('current-user-name').textContent = currentUser;
+  updateAppTitle();
   loadHistoricalData();
   migrateData();
   const now = new Date();
@@ -1492,8 +1485,18 @@ function init() {
   setupEventListeners();
   renderDashboard();
   checkBackupReminder();
+
   if (typeof initFirebase === 'function') initFirebase();
   if (typeof updateCloudUI === 'function') setTimeout(updateCloudUI, 100);
+
+  // Show welcome modal for first-time users (no local data, not logged in)
+  if (!savedLocal && !urlUser && !getData().length) {
+    setTimeout(() => {
+      if (typeof _fbUser === 'undefined' || !_fbUser) {
+        openModal('modal-welcome');
+      }
+    }, 300);
+  }
 }
 
 function setupEventListeners() {

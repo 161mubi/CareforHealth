@@ -15,15 +15,10 @@
     <!-- ===== Dashboard ===== -->
     <section id="view-dashboard" class="view active">
       <header class="view-header">
-        <h1><span id="current-user-name"></span> 的健康日记</h1>
-        <div class="header-btns">
-        <button class="icon-btn" onclick="showUserPicker()" aria-label="切换用户" title="切换用户">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        </button>
+        <h1 id="app-title">健康日记</h1>
         <button class="icon-btn" onclick="showSettings()" aria-label="设置">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         </button>
-        </div>
       </header>
       <div class="view-body">
         <div class="quick-actions">
@@ -425,22 +420,20 @@
       </div>
     </div>
 
-    <!-- User Picker Modal -->
-    <div id="modal-user" class="modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>切换用户</h2>
-          <button class="icon-btn" onclick="closeModal('modal-user')">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
+    <!-- Welcome Modal -->
+    <div id="modal-welcome" class="modal">
+      <div class="modal-content" style="border-radius:20px;max-width:380px;margin:auto">
+        <div style="text-align:center;padding:20px 0 10px">
+          <div style="font-size:48px;margin-bottom:12px">📋</div>
+          <h2 style="font-size:22px;margin-bottom:6px">欢迎使用健康日记</h2>
+          <p style="color:var(--text2);font-size:14px">记录偏头痛与经期，守护你的健康</p>
         </div>
-        <div class="user-picker-body">
-          <div id="user-list" class="user-list"></div>
-          <div class="user-add-row">
-            <input type="text" id="new-user-input" placeholder="输入新用户名..." maxlength="20">
-            <button class="user-add-btn" onclick="addNewUser()">添加</button>
-          </div>
-          <p class="user-hint">每位用户的数据独立存储，互不影响。<br>分享链接时加上 <code>?user=名字</code> 即可直接进入对应用户。</p>
+        <div class="welcome-actions">
+          <button class="btn-primary" onclick="showCloudAuth();closeModal('modal-welcome')">登录 / 注册</button>
+          <p class="welcome-cloud-hint">登录后数据自动同步到云端，跨设备访问、永不丢失</p>
+          <div class="welcome-divider"><span>或</span></div>
+          <button class="btn-secondary" onclick="startLocalMode()">不登录，本地使用</button>
+          <p class="welcome-local-hint">数据仅保存在当前浏览器中</p>
         </div>
       </div>
     </div>

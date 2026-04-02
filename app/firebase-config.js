@@ -232,6 +232,7 @@ async function doForgotPassword() {
 
 // ===== Cloud UI Updates =====
 function updateCloudUI() {
+  if (typeof updateAppTitle === 'function') updateAppTitle();
   const authSection = document.getElementById('settings-cloud');
   if (!authSection) return;
 
