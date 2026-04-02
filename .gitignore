@@ -13,3 +13,10 @@ Thumbs.db
 
 # PDFs (generated files)
 *.pdf
+
+# Private data
+*.docx
+Lisa_*.json
+Lisa_*.md
+2024-2026_Lisa_*
+_print_style.css
