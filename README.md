@@ -38,9 +38,16 @@
 - **关联分析**：按星期几统计、按天气统计、经期关联分析、持续时长统计
 - **经期周期年度统计**：经期持续天数、周期天数趋势
 
+### 云端同步（可选）
+
+- 支持邮箱注册/登录，数据自动同步到 Firebase 云端
+- 注册时可设置昵称，登录后在设置页随时修改
+- 跨设备访问：手机、平板、电脑数据自动同步
+- 退出登录后自动清除本地缓存，保护隐私
+- 也可纯本地使用，无需注册
+
 ### 其他功能
 
-- 多用户支持（数据隔离）
 - 暗色模式
 - 数据导出/导入（JSON 格式）
 - 自定义选项（伴随症状、诱因、缓解方法等均可添加/删除选项）
@@ -73,9 +80,14 @@
 如果你想拥有自己的独立实例：
 
 1. Fork 本仓库
-2. 进入仓库 Settings → Pages
-3. Source 选择 "GitHub Actions"
-4. 推送任意提交后会自动部署到 `https://你的用户名.github.io/CareforHealth/`
+2. 进入仓库 Settings → Pages → Source 选择 "GitHub Actions"
+3. 推送任意提交后会自动部署到 `https://你的用户名.github.io/CareforHealth/`
+
+如需启用云端同步，还需：
+
+4. 在 [Firebase Console](https://console.firebase.google.com/) 创建项目
+5. 启用 Authentication（邮箱/密码登录）和 Cloud Firestore
+6. 注册 Web 应用，将 `firebaseConfig` 填入 `app/firebase-config.js` 顶部的 `FIREBASE_CONFIG`
 
 或在本地运行：
 
@@ -87,28 +99,28 @@ python3 -m http.server 8765
 
 ## 数据说明
 
-- 所有数据存储在**浏览器本地**（localStorage），不会上传到任何服务器
-- 不同设备、不同浏览器的数据相互独立
+- **本地模式**：数据存储在浏览器本地（localStorage），不会上传到任何服务器，不同设备/浏览器的数据相互独立
+- **云端模式**：注册登录后，数据自动同步到 Firebase Cloud Firestore（服务器位于亚太地区），支持跨设备访问
 - 建议定期通过「设置 → 导出数据」备份为 JSON 文件
-- 换设备时可通过「设置 → 导入数据」恢复
+- 换设备时可通过「设置 → 导入数据」恢复，或登录同一账号自动同步
 
 ## 技术栈
 
-纯前端实现，无需后端：
-
 - HTML + CSS + JavaScript（原生，无框架依赖）
 - PWA（Service Worker + Web App Manifest）
+- Firebase Authentication + Cloud Firestore（可选云端同步）
 - GitHub Actions 自动部署到 GitHub Pages
 
 ## 项目结构
 
 ```
 app/
-├── index.html      # 页面结构
-├── style.css       # 样式
-├── app.js          # 应用逻辑
-├── manifest.json   # PWA 配置
-└── sw.js           # Service Worker
+├── index.html          # 页面结构
+├── style.css           # 样式
+├── app.js              # 应用逻辑
+├── firebase-config.js  # Firebase 配置与云端同步
+├── manifest.json       # PWA 配置
+└── sw.js               # Service Worker
 ```
 
 ## 许可
